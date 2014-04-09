@@ -6,12 +6,12 @@
     function BubbleChart(data) {
       this.hide_details = __bind(this.hide_details, this);
       this.show_details = __bind(this.show_details, this);
-      this.hide_years = __bind(this.hide_years, this);
-      this.display_years = __bind(this.display_years, this);
       this.move_towards_year = __bind(this.move_towards_year, this);
-      this.move_to_location_func = __bind(this.move_to_location_func, this);
+      this.move_to_location_map = __bind(this.move_to_location_map, this);
       this.move_towards_candidates = __bind(this.move_towards_candidates, this);
       this.split_candidates = __bind(this.split_candidates, this);
+      this.split_party = __bind(this.split_party, this);
+      this.do_split = __bind(this.do_split, this);
       this.display_by_year = __bind(this.display_by_year, this);
       this.move_towards_center = __bind(this.move_towards_center, this);
       this.display_group_all = __bind(this.display_group_all, this);
@@ -22,7 +22,7 @@
       var max_amount;
       this.data = data;
       this.width = 1250;
-      this.height = 900;
+      this.height = 1500;
       this.tooltip = CustomTooltip("gates_tooltip", 240);
       this.center = {
         x: this.width / 2,
@@ -56,6 +56,7 @@
             name: d.candidate_name,
             org: 'org',
             group: 'group',
+            party: d.party,
             category: d.expenditure_category,
             office: d.office,
             election_period: d.election_period,
@@ -158,8 +159,7 @@
           });
         };
       })(this));
-      this.force.start();
-      return this.hide_years();
+      return this.force.start();
     };
 
     BubbleChart.prototype.move_towards_center = function(alpha) {
@@ -185,14 +185,12 @@
       return this.display_years();
     };
 
-    BubbleChart.prototype.split_candidates = function() {
-      var location_func, titles;
-      location_func = this.move_to_location_func(this.nodes, function(d) {
-        return d.name;
-      });
-      this.force.gravity(this.layout_gravity).charge(this.charge).chargeDistance(200).friction(0.9).on("tick", (function(_this) {
+    BubbleChart.prototype.do_split = function(accessor) {
+      var location_map, titles;
+      location_map = this.move_to_location_map(this.nodes, accessor);
+      this.force.gravity(this.layout_gravity).charge(this.charge).chargeDistance(300).friction(0.9).on("tick", (function(_this) {
         return function(e) {
-          return _this.circles.each(_this.move_towards_candidates(e.alpha, location_func)).attr('cx', function(d) {
+          return _this.circles.each(_this.move_towards_candidates(e.alpha, location_map, accessor)).attr('cx', function(d) {
             return d.x;
           }).attr('cy', function(d) {
             return d.y;
@@ -200,28 +198,43 @@
         };
       })(this));
       this.force.start();
-      titles = this.vis.selectAll('.years').data(location_func.values());
-      return titles.enter().append('text').text(function(d) {
-        return d.name;
+      titles = this.vis.selectAll('text.titles').data(location_map.values(), function(d) {
+        return d.key;
+      });
+      titles.enter().append('text').attr("class", "titles").text(function(d) {
+        return d.key;
       }).attr("text-anchor", "middle").attr('x', function(d) {
         return d.x;
       }).attr('y', function(d) {
         return d.y + 200;
       });
+      return titles.exit().remove();
     };
 
-    BubbleChart.prototype.move_towards_candidates = function(alpha, location_func) {
+    BubbleChart.prototype.split_party = function() {
+      return this.do_split(function(d) {
+        return d.party;
+      });
+    };
+
+    BubbleChart.prototype.split_candidates = function() {
+      return this.do_split(function(d) {
+        return d.name;
+      });
+    };
+
+    BubbleChart.prototype.move_towards_candidates = function(alpha, location_map, accessor) {
       return (function(_this) {
         return function(d) {
           var target;
-          target = location_func.get(d.name);
+          target = location_map.get(accessor(d));
           d.x = d.x + (target.x - d.x) * (_this.damper + 0.02) * alpha * 1.1;
           return d.y = d.y + (target.y - d.y) * (_this.damper + 0.02) * alpha * 1.1;
         };
       })(this);
     };
 
-    BubbleChart.prototype.move_to_location_func = function(nodes, grouping_func) {
+    BubbleChart.prototype.move_to_location_map = function(nodes, grouping_func) {
       var get_height, get_width, groupings_per_row, groups, i, min_grouping_height, min_grouping_width;
       min_grouping_width = 300;
       groupings_per_row = Math.floor(this.width / min_grouping_width) - 1;
@@ -235,7 +248,7 @@
         return function(i) {
           var num_row;
           num_row = Math.floor(i / groupings_per_row) + 1;
-          return num_row * min_grouping_height;
+          return num_row * min_grouping_height - 100;
         };
       })(this);
       groups = d3.nest().key(grouping_func).rollup(function(leaves) {
@@ -249,7 +262,7 @@
       groups.keys().sort(d3.ascending).forEach(function(key) {
         var entry;
         entry = groups.get(key);
-        entry['name'] = key;
+        entry['key'] = key;
         entry['x'] = get_width(i);
         entry['y'] = get_height(i);
         groups.set(key, entry);
@@ -269,29 +282,6 @@
       })(this);
     };
 
-    BubbleChart.prototype.display_years = function() {
-      var years, years_data, years_x;
-      years_x = {
-        "2008-2010": 160,
-        "2010-2012": this.width / 2,
-        "2012-2014": this.width - 160
-      };
-      years_data = d3.keys(years_x);
-      years = this.vis.selectAll(".years").data(years_data);
-      return years.enter().append("text").attr("class", "years").attr("text-anchor", "middle").attr("x", (function(_this) {
-        return function(d) {
-          return years_x[d];
-        };
-      })(this)).attr("y", 40).text(function(d) {
-        return 'af';
-      });
-    };
-
-    BubbleChart.prototype.hide_years = function() {
-      var years;
-      return years = this.vis.selectAll(".years").remove();
-    };
-
     BubbleChart.prototype.show_details = function(data, i, element) {
       var content;
       d3.select(element).attr("stroke", "black");
@@ -299,6 +289,7 @@
       content += "<span class=\"name\">Amount:</span><span class=\"value\"> $" + (addCommas(data.value)) + "</span><br/>";
       content += "<span class=\"name\">Category:</span><span class=\"value\"> " + data.category + "</span><br/>";
       content += "<span class=\"name\">Office:</span><span class=\"value\"> " + data.office + "</span><br/>";
+      content += "<span class=\"name\">Party:</span><span class=\"value\"> " + data.party + "</span><br/>";
       content += "<span class=\"name\">Election Period:</span><span class=\"value\"> " + data.election_period + "</span>";
       return this.tooltip.showTooltip(content, d3.event);
     };
@@ -319,7 +310,7 @@
   root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
   $(function() {
-    var chart, render_vis;
+    var chart, filter_data, join_data, render_vis;
     $('.filter-buttons .button').on('click', function(e) {
       e.preventDefault();
       console.log('clicked filter button!');
@@ -328,10 +319,33 @@
     console.log('begin vis.coffee');
     window.counter = 0;
     chart = null;
-    render_vis = function(csv) {
-      var filtered_csv, mygroups, reduced;
-      filtered_csv = csv.filter(function(d) {
-        return d.election_period === '2010-2012' && d.office === 'Governor';
+    join_data = function(expend_recs, org_recs) {
+      var expend_rec, full_records, i, j, org_rec;
+      full_records = [];
+      i = 0;
+      j = 0;
+      while (true) {
+        expend_rec = expend_recs[i];
+        org_rec = org_recs[j];
+        if ((expend_rec == null) || (org_rec == null)) {
+          break;
+        }
+        if (expend_rec.reg_no === org_rec.reg_no) {
+          full_records.push($.extend({}, expend_rec, org_rec));
+          i++;
+        } else if (expend_rec.reg_no !== org_rec.reg_no) {
+          j++;
+        }
+      }
+      return full_records;
+    };
+    filter_data = function(records) {
+      var filtered_csv, reduced, sorted;
+      filtered_csv = records.filter(function(d) {
+        return d.election_period === '2012-2014';
+      });
+      sorted = filtered_csv.sort(function(a, b) {
+        return d3.descending(parseFloat(a.amount), parseFloat(b.amount));
       });
       reduced = _.reduce(filtered_csv, function(acc, d) {
         var curr;
@@ -341,15 +355,22 @@
         }
         curr.push(d);
         curr = _.sortBy(curr, function(d) {
-          return parseInt(d.amount.slice(5));
+          return parseFloat(d.amount.slice(5));
         }).reverse();
         acc[d.candidate_name] = _.first(curr, 1);
         return acc;
       }, {});
-      chart = new BubbleChart(filtered_csv);
+      filtered_csv;
+      return sorted;
+    };
+    render_vis = function(error, expenditure_records, organizational_records) {
+      var filtered_records, mygroups, raw_records;
+      raw_records = join_data(expenditure_records, organizational_records);
+      filtered_records = filter_data(raw_records);
+      chart = new BubbleChart(filtered_records);
       chart.start();
       root.display_all();
-      mygroups = chart.move_to_location_func(window.nodes, (function(_this) {
+      mygroups = chart.move_to_location_map(window.nodes, (function(_this) {
         return function(d) {
           return d.name;
         };
@@ -389,10 +410,23 @@
       e.preventDefault();
       func = $(e.target).data('name');
       if (func === 'candidate') {
-        return window.get_chart().split_candidates();
+        window.get_chart().split_candidates();
+      }
+      if (func === 'party') {
+        window.get_chart().split_party();
+      }
+      if (func === 'expenditure') {
+        window.get_chart().do_split(function(d) {
+          return d.category;
+        });
+      }
+      if (func === 'office') {
+        return window.get_chart().do_split(function(d) {
+          return d.office;
+        });
       }
     });
-    return d3.csv("data/campaign_spending_summary.csv", render_vis);
+    return queue().defer(d3.csv, "data/campaign_spending_summary.csv").defer(d3.csv, "data/organizational_report.csv").await(render_vis);
   });
 
 }).call(this);
