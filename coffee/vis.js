@@ -7,9 +7,11 @@
       this.hide_details = __bind(this.hide_details, this);
       this.show_details = __bind(this.show_details, this);
       this.move_towards_year = __bind(this.move_towards_year, this);
+      this.get_candidate_short_name = __bind(this.get_candidate_short_name, this);
       this.get_supercategory = __bind(this.get_supercategory, this);
       this.move_to_location_map = __bind(this.move_to_location_map, this);
       this.move_towards_candidates = __bind(this.move_towards_candidates, this);
+      this.format_money_millions = __bind(this.format_money_millions, this);
       this.do_split = __bind(this.do_split, this);
       this.split_amount = __bind(this.split_amount, this);
       this.display_by_year = __bind(this.display_by_year, this);
@@ -23,7 +25,7 @@
       this.data = data;
       this.width = 1250;
       this.height = 1500;
-      this.tooltip = CustomTooltip("gates_tooltip", 240);
+      this.tooltip = CustomTooltip("expenditure_tooltip", 300);
       this.center = {
         x: this.width / 2,
         y: Math.min(this.height / 2, 400)
@@ -61,6 +63,7 @@
             super_category: _this.get_supercategory(d.expenditure_category),
             office: d.office,
             election_period: d.election_period,
+            election_year: d.election_period.split('-')[1],
             x: Math.random() * 900,
             y: Math.random() * 800
           };
@@ -135,7 +138,7 @@
     };
 
     BubbleChart.prototype.charge = function(d) {
-      return -Math.pow(d.radius, 2.0) / 8;
+      return -(Math.pow(d.radius, 2.0) / 7) + -(d.radius * 0.1) + -.3;
     };
 
     BubbleChart.prototype.start = function() {
@@ -183,7 +186,7 @@
     BubbleChart.prototype.do_split = function(accessor) {
       var location_map, titles;
       location_map = this.move_to_location_map(this.nodes, accessor);
-      this.force.gravity(this.layout_gravity).charge(this.charge).chargeDistance(300).friction(0.9).on("tick", (function(_this) {
+      this.force.gravity(this.layout_gravity).charge(this.charge).chargeDistance(300).friction(0.87).on("tick", (function(_this) {
         return function(e) {
           return _this.circles.each(_this.move_towards_candidates(e.alpha, location_map, accessor)).attr('cx', function(d) {
             return d.x;
@@ -196,14 +199,28 @@
       titles = this.vis.selectAll('text.titles').data(location_map.values(), function(d) {
         return d.key;
       });
-      titles.enter().append('text').attr("class", "titles").text(function(d) {
+      titles.enter().append('text').attr("class", "titles header").text(function(d) {
         return d.key;
       }).attr("text-anchor", "middle").attr('x', function(d) {
         return d.x;
       }).attr('y', function(d) {
         return d.y + 200;
       });
+      titles.enter().append('text').attr('class', 'titles amount').text((function(_this) {
+        return function(d) {
+          return _this.format_money_millions(parseFloat(d.sum));
+        };
+      })(this)).attr('text-anchor', 'middle').attr('x', function(d) {
+        return d.x;
+      }).attr('y', function(d) {
+        return d.y + 220;
+      });
       return titles.exit().remove();
+    };
+
+    BubbleChart.prototype.format_money_millions = function(amount_in_dollars) {
+      console.log('called to format ' + amount_in_dollars);
+      return d3.format('$,.2f')(amount_in_dollars / 1e6) + ' million';
     };
 
     BubbleChart.prototype.move_towards_candidates = function(alpha, location_map, accessor) {
@@ -234,15 +251,20 @@
           return num_row * min_grouping_height - 100;
         };
       })(this);
-      groups = d3.nest().key(grouping_func).rollup(function(leaves) {
-        return {
-          sum: d3.sum(leaves, function(d) {
-            return parseFloat(d.value);
-          })
+      groups = d3.nest().key(grouping_func).rollup((function(_this) {
+        return function(leaves) {
+          return {
+            sum: d3.sum(leaves, function(d) {
+              return parseFloat(d.value);
+            }),
+            candidates: d3.set(leaves.map(_this.get_candidate_short_name)).values()
+          };
         };
-      }).map(nodes, d3.map);
+      })(this)).map(nodes, d3.map);
       i = 0;
-      groups.keys().sort(d3.ascending).forEach(function(key) {
+      groups.keys().sort(function(a, b) {
+        return d3.descending(parseFloat(groups.get(a).sum), parseFloat(groups.get(b).sum));
+      }).forEach(function(key) {
         var entry;
         entry = groups.get(key);
         entry['key'] = key;
@@ -270,6 +292,10 @@
       }
     };
 
+    BubbleChart.prototype.get_candidate_short_name = function(d) {
+      return d.name.split(',')[0] + (" (" + d.party[0] + ")");
+    };
+
     BubbleChart.prototype.move_towards_year = function(alpha) {
       return (function(_this) {
         return function(d) {
@@ -284,14 +310,13 @@
     BubbleChart.prototype.show_details = function(data, i, element) {
       var content;
       d3.select(element).attr("stroke", "black");
-      content = "<span class=\"name\">Candidate:</span><span class=\"value\"> " + data.name + "</span><br/>";
-      content += "<span class=\"name\">Amount:</span><span class=\"value\"> $" + (addCommas(data.value)) + "</span><br/>";
-      content += "<span class=\"name\">Category:</span><span class=\"value\"> " + data.category + "</span><br/>";
-      content += "<span class=\"name\">Super Category:</span><span class=\"value\"> " + data.super_category + "</span><br/>";
-      content += "<span class=\"name\">Office:</span><span class=\"value\"> " + data.office + "</span><br/>";
-      content += "<span class=\"name\">Party:</span><span class=\"value\"> " + data.party + "</span><br/>";
-      content += "<span class=\"name\">Election Period:</span><span class=\"value\"> " + data.election_period + "</span>";
-      return this.tooltip.showTooltip(content, d3.event);
+      content = "<div class=\"inner_tooltip\">";
+      content += "<span class=\"candidate\">" + data.name + "</span><br/>";
+      content += "" + data.election_year + ", " + data.office + "<br/>";
+      content += "<span class=\"amount\"> " + data.category + " $" + (addCommas(data.value)) + "</span><br/>";
+      content += "</div>";
+      this.tooltip.showTooltip(content, d3.event);
+      return d3.select(element).move_to_front();
     };
 
     BubbleChart.prototype.hide_details = function(data, i, element) {
@@ -338,7 +363,7 @@
     filter_data = function(records) {
       var filtered_csv, reduced, sorted;
       filtered_csv = records.filter(function(d) {
-        return d.election_period === '2010-2012' && d.office === 'Governor';
+        return d.election_period === '2012-2014';
       });
       sorted = filtered_csv.sort(function(a, b) {
         return d3.descending(parseFloat(a.amount), parseFloat(b.amount));
@@ -363,6 +388,7 @@
       var filtered_records, raw_records;
       raw_records = join_data(expenditure_records, organizational_records);
       filtered_records = filter_data(raw_records);
+      window.records = filtered_records;
       chart = new BubbleChart(filtered_records);
       chart.start();
       return root.display_all();
