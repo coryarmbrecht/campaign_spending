@@ -7,11 +7,11 @@
       this.hide_details = __bind(this.hide_details, this);
       this.show_details = __bind(this.show_details, this);
       this.move_towards_year = __bind(this.move_towards_year, this);
+      this.get_supercategory = __bind(this.get_supercategory, this);
       this.move_to_location_map = __bind(this.move_to_location_map, this);
       this.move_towards_candidates = __bind(this.move_towards_candidates, this);
-      this.split_candidates = __bind(this.split_candidates, this);
-      this.split_party = __bind(this.split_party, this);
       this.do_split = __bind(this.do_split, this);
+      this.split_amount = __bind(this.split_amount, this);
       this.display_by_year = __bind(this.display_by_year, this);
       this.move_towards_center = __bind(this.move_towards_center, this);
       this.display_group_all = __bind(this.display_group_all, this);
@@ -26,7 +26,7 @@
       this.tooltip = CustomTooltip("gates_tooltip", 240);
       this.center = {
         x: this.width / 2,
-        y: this.height / 2
+        y: Math.min(this.height / 2, 400)
       };
       this.layout_gravity = -0.01;
       this.damper = 0.1;
@@ -58,6 +58,7 @@
             group: 'group',
             party: d.party,
             category: d.expenditure_category,
+            super_category: _this.get_supercategory(d.expenditure_category),
             office: d.office,
             election_period: d.election_period,
             x: Math.random() * 900,
@@ -96,11 +97,7 @@
         return function(d) {
           return _this.fill_color(d);
         };
-      })(this)).attr("stroke-width", 2).attr("stroke", (function(_this) {
-        return function(d) {
-          return d3.rgb(_this.fill_color(d)).darker();
-        };
-      })(this)).attr("id", function(d) {
+      })(this)).attr("stroke-width", 2).attr("id", function(d) {
         return "bubble_" + d.id;
       }).on("mouseover", function(d, i) {
         return that.show_details(d, i, this);
@@ -121,15 +118,11 @@
         return d.id;
       });
       that = this;
-      this.circles.enter().append("circle").attr("r", 0).attr("fill", (function(_this) {
+      this.circles.enter().append("circle").attr("r", 0).attr('class', (function(_this) {
         return function(d) {
-          return _this.fill_color(d);
+          return _this.get_supercategory(d.category);
         };
-      })(this)).attr("stroke-width", 2).attr("stroke", (function(_this) {
-        return function(d) {
-          return d3.rgb(_this.fill_color(d)).darker();
-        };
-      })(this)).attr("id", function(d) {
+      })(this)).attr("stroke-width", 2).attr("id", function(d) {
         return "bubble_" + d.id;
       }).on("mouseover", function(d, i) {
         return that.show_details(d, i, this);
@@ -185,6 +178,8 @@
       return this.display_years();
     };
 
+    BubbleChart.prototype.split_amount = function() {};
+
     BubbleChart.prototype.do_split = function(accessor) {
       var location_map, titles;
       location_map = this.move_to_location_map(this.nodes, accessor);
@@ -209,18 +204,6 @@
         return d.y + 200;
       });
       return titles.exit().remove();
-    };
-
-    BubbleChart.prototype.split_party = function() {
-      return this.do_split(function(d) {
-        return d.party;
-      });
-    };
-
-    BubbleChart.prototype.split_candidates = function() {
-      return this.do_split(function(d) {
-        return d.name;
-      });
     };
 
     BubbleChart.prototype.move_towards_candidates = function(alpha, location_map, accessor) {
@@ -271,6 +254,22 @@
       return groups;
     };
 
+    BubbleChart.prototype.get_supercategory = function(category) {
+      if (category === 'Durable Assets' || category === 'Food & Beverages' || category === 'Insurance' || category === 'Lease/Rent' || category === 'Office Supplies' || category === 'Travel & Lodging' || category === 'Utilities' || category === 'Vehicle') {
+        return 'overhead';
+      } else if (category === 'Contribution to Community Organization' || category === 'Contribution to Political Party' || category === 'Hawaii Election Campaign Fund') {
+        return 'contributions';
+      } else if (category === 'Advertising' || category === 'Candidate Fundraiser Tickets' || category === 'Postage/Mailing' || category === 'Printing' || category === 'Surveys, Polls & Voter Lists') {
+        return 'communication';
+      } else if (category === 'Employee Services' || category === 'Professional Services') {
+        return 'staff';
+      } else if (category === 'Bank Charges & Adjustments' || category === 'Filing Fee' || category === 'Taxes') {
+        return 'fees';
+      } else if (category === 'Other') {
+        return 'other';
+      }
+    };
+
     BubbleChart.prototype.move_towards_year = function(alpha) {
       return (function(_this) {
         return function(d) {
@@ -288,6 +287,7 @@
       content = "<span class=\"name\">Candidate:</span><span class=\"value\"> " + data.name + "</span><br/>";
       content += "<span class=\"name\">Amount:</span><span class=\"value\"> $" + (addCommas(data.value)) + "</span><br/>";
       content += "<span class=\"name\">Category:</span><span class=\"value\"> " + data.category + "</span><br/>";
+      content += "<span class=\"name\">Super Category:</span><span class=\"value\"> " + data.super_category + "</span><br/>";
       content += "<span class=\"name\">Office:</span><span class=\"value\"> " + data.office + "</span><br/>";
       content += "<span class=\"name\">Party:</span><span class=\"value\"> " + data.party + "</span><br/>";
       content += "<span class=\"name\">Election Period:</span><span class=\"value\"> " + data.election_period + "</span>";
@@ -295,11 +295,7 @@
     };
 
     BubbleChart.prototype.hide_details = function(data, i, element) {
-      d3.select(element).attr("stroke", (function(_this) {
-        return function(d) {
-          return d3.rgb(_this.fill_color(d)).darker();
-        };
-      })(this));
+      d3.select(element).attr("stroke", '');
       return this.tooltip.hideTooltip();
     };
 
@@ -342,7 +338,7 @@
     filter_data = function(records) {
       var filtered_csv, reduced, sorted;
       filtered_csv = records.filter(function(d) {
-        return d.election_period === '2012-2014';
+        return d.election_period === '2010-2012' && d.office === 'Governor';
       });
       sorted = filtered_csv.sort(function(a, b) {
         return d3.descending(parseFloat(a.amount), parseFloat(b.amount));
@@ -364,22 +360,12 @@
       return sorted;
     };
     render_vis = function(error, expenditure_records, organizational_records) {
-      var filtered_records, mygroups, raw_records;
+      var filtered_records, raw_records;
       raw_records = join_data(expenditure_records, organizational_records);
       filtered_records = filter_data(raw_records);
       chart = new BubbleChart(filtered_records);
       chart.start();
-      root.display_all();
-      mygroups = chart.move_to_location_map(window.nodes, (function(_this) {
-        return function(d) {
-          return d.name;
-        };
-      })(this));
-      _.each(mygroups.values(), function(d) {
-        return console.log(JSON.stringify(d));
-      });
-      console.log(mygroups);
-      return window.mygroups = mygroups;
+      return root.display_all();
     };
     root.display_all = (function(_this) {
       return function() {
@@ -410,20 +396,27 @@
       e.preventDefault();
       func = $(e.target).data('name');
       if (func === 'candidate') {
-        window.get_chart().split_candidates();
+        window.get_chart().do_split(function(d) {
+          return d.name;
+        });
       }
       if (func === 'party') {
-        window.get_chart().split_party();
+        window.get_chart().do_split(function(d) {
+          return d.party;
+        });
       }
       if (func === 'expenditure') {
         window.get_chart().do_split(function(d) {
-          return d.category;
+          return d.super_category;
         });
       }
       if (func === 'office') {
-        return window.get_chart().do_split(function(d) {
+        window.get_chart().do_split(function(d) {
           return d.office;
         });
+      }
+      if (func === 'amount') {
+        return window.get_chart().split_amount();
       }
     });
     return queue().defer(d3.csv, "data/campaign_spending_summary.csv").defer(d3.csv, "data/organizational_report.csv").await(render_vis);
