@@ -24,7 +24,7 @@
       var max_amount;
       this.data = data;
       this.width = 1250;
-      this.height = 1500;
+      this.height = 3500;
       this.tooltip = CustomTooltip("expenditure_tooltip", 300);
       this.center = {
         x: this.width / 2,
@@ -186,7 +186,7 @@
     BubbleChart.prototype.do_split = function(accessor) {
       var location_map, titles;
       location_map = this.move_to_location_map(this.nodes, accessor);
-      this.force.gravity(this.layout_gravity).charge(this.charge).chargeDistance(300).friction(0.87).on("tick", (function(_this) {
+      this.force.gravity(0).charge(this.charge).chargeDistance(300).friction(0.87).on("tick", (function(_this) {
         return function(e) {
           return _this.circles.each(_this.move_towards_candidates(e.alpha, location_map, accessor)).attr('cx', function(d) {
             return d.x;
@@ -219,7 +219,6 @@
     };
 
     BubbleChart.prototype.format_money_millions = function(amount_in_dollars) {
-      console.log('called to format ' + amount_in_dollars);
       return d3.format('$,.2f')(amount_in_dollars / 1e6) + ' million';
     };
 
@@ -238,7 +237,7 @@
       var get_height, get_width, groupings_per_row, groups, i, min_grouping_height, min_grouping_width;
       min_grouping_width = 300;
       groupings_per_row = Math.floor(this.width / min_grouping_width) - 1;
-      min_grouping_height = 300;
+      min_grouping_height = 350;
       get_width = (function(_this) {
         return function(i) {
           return ((i % groupings_per_row) + 1) * min_grouping_width;
@@ -332,13 +331,6 @@
 
   $(function() {
     var chart, filter_data, join_data, render_vis;
-    $('.filter-buttons .button').on('click', function(e) {
-      e.preventDefault();
-      console.log('clicked filter button!');
-      return window.get_chart().split_candidates();
-    });
-    console.log('begin vis.coffee');
-    window.counter = 0;
     chart = null;
     join_data = function(expend_recs, org_recs) {
       var expend_rec, full_records, i, j, org_rec;
@@ -418,9 +410,10 @@
       };
     })(this);
     $('#viz_nav_container .viz_nav').on('click', function(e) {
-      var func;
+      var $target, func;
       e.preventDefault();
-      func = $(e.target).data('name');
+      $target = $(e.target);
+      func = $target.data('name');
       if (func === 'candidate') {
         window.get_chart().do_split(function(d) {
           return d.name;
