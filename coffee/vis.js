@@ -1,72 +1,73 @@
 (function() {
-  var BubbleChart, root,
-    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+  var BubbleChart, campaignInit, root,
+    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   BubbleChart = (function() {
     function BubbleChart(data) {
       this.hide_details = __bind(this.hide_details, this);
       this.show_details = __bind(this.show_details, this);
       this.move_towards_year = __bind(this.move_towards_year, this);
+      this.estimate_circle_diameter = __bind(this.estimate_circle_diameter, this);
       this.get_candidate_short_name = __bind(this.get_candidate_short_name, this);
       this.get_supercategory = __bind(this.get_supercategory, this);
       this.move_to_location_map = __bind(this.move_to_location_map, this);
       this.move_towards_candidates = __bind(this.move_towards_candidates, this);
       this.format_money_millions = __bind(this.format_money_millions, this);
       this.do_split = __bind(this.do_split, this);
+      this.show_viz_type = __bind(this.show_viz_type, this);
       this.split_amount = __bind(this.split_amount, this);
-      this.display_by_year = __bind(this.display_by_year, this);
       this.move_towards_center = __bind(this.move_towards_center, this);
       this.display_group_all = __bind(this.display_group_all, this);
-      this.start = __bind(this.start, this);
+      this.create_circles = __bind(this.create_circles, this);
       this.create_vis = __bind(this.create_vis, this);
-      this.bind_data = __bind(this.bind_data, this);
+      this.update_data = __bind(this.update_data, this);
+      this.kill_forces = __bind(this.kill_forces, this);
       this.create_nodes = __bind(this.create_nodes, this);
       var max_amount;
       this.data = data;
-      this.width = 1250;
+      this.width = 1350;
       this.height = 3500;
       this.tooltip = CustomTooltip("expenditure_tooltip", 300);
-      this.center = {
-        x: this.width / 2,
-        y: Math.min(this.height / 2, 400)
-      };
-      this.layout_gravity = -0.01;
       this.damper = 0.1;
       this.vis = null;
       this.nodes = [];
-      this.force = null;
+      this.forces = [];
       this.circles = null;
-      this.fill_color = function(d) {
-        return d3.scale.linear().domain([-1000, 1000]).range(['#fbb4ae', '#b3cde3', '#ccebc5', '#decbe4', '#fed9a6', '#ffffcc', '#e5d8bd'])(hash_code(d.name) % 1000);
-      };
-      max_amount = d3.max(this.data, function(d) {
-        return parseInt(d.amount);
-      });
+      max_amount = 1173620 * 1.21;
       this.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
-      this.create_nodes();
+      console.log('max_amount ' + max_amount);
+      console.log(this.radius_scale);
+      this.create_nodes(this.data);
       this.create_vis();
     }
 
-    BubbleChart.prototype.create_nodes = function() {
-      this.data.forEach((function(_this) {
+    BubbleChart.prototype.create_nodes = function(data) {
+      this.nodes = [];
+      data.forEach((function(_this) {
         return function(d) {
-          var node;
+          var node, radius;
           node = {
             id: d.id,
             radius: _this.radius_scale(parseInt(d.amount)),
-            value: d.amount,
+            value: parseFloat(d.amount),
             name: d.candidate_name,
             org: 'org',
             group: 'group',
             party: d.party,
+            reg_no: d.reg_no,
             category: d.expenditure_category,
             super_category: _this.get_supercategory(d.expenditure_category),
             office: d.office,
             election_period: d.election_period,
             election_year: d.election_period.split('-')[1],
-            x: Math.random() * 900,
+            x: Math.random() * 1,
             y: Math.random() * 800
           };
+          radius = _this.radius_scale(parseInt(d.amount));
+          if (radius < 0) {
+            console.log("Radius less than 0 for node! " + JSON.stringify(node));
+          }
           return _this.nodes.push(node);
         };
       })(this));
@@ -76,77 +77,76 @@
       return window.nodes = this.nodes;
     };
 
-    BubbleChart.prototype.bind_data = function() {
-      var obj, that;
-      obj = {
-        category: 'fun',
-        election_period: '2010-2012',
-        group: 'gr',
-        id: 999,
-        name: 'jason',
-        office: 'gov',
-        org: 'org',
-        value: '$110322.21',
-        radius: 100,
-        x: 500,
-        y: 244
-      };
-      this.nodes.push(obj);
-      this.circles = this.vis.selectAll("circle").data(this.nodes, function(d) {
-        return d.id;
-      });
-      that = this;
-      this.circles.enter().append("circle").attr("fill", (function(_this) {
-        return function(d) {
-          return _this.fill_color(d);
+    BubbleChart.prototype.kill_forces = function() {
+      return this.forces.forEach((function(_this) {
+        return function(force) {
+          force.stop();
+          return force.nodes([]);
         };
-      })(this)).attr("stroke-width", 2).attr("id", function(d) {
-        return "bubble_" + d.id;
-      }).on("mouseover", function(d, i) {
-        return that.show_details(d, i, this);
-      }).on("mouseout", function(d, i) {
-        return that.hide_details(d, i, this);
-      });
-      this.circles.exit().remove();
-      this.circles.transition().duration(1000).attr("r", function(d) {
-        return d.radius;
-      });
-      return this.display_group_all();
+      })(this));
+    };
+
+    BubbleChart.prototype.update_data = function(records) {
+      var func;
+      this.kill_forces();
+      this.create_nodes(records);
+      this.create_circles();
+      func = $('.viz_nav.btn.selected').data('name');
+      if (func == null) {
+        func = 'year';
+      }
+      console.log("func is " + func);
+      return this.show_viz_type(func);
     };
 
     BubbleChart.prototype.create_vis = function() {
-      var that;
       this.vis = d3.select("#vis").append("svg").attr("width", this.width).attr("height", this.height).attr("id", "svg_vis");
+      return this.create_circles();
+    };
+
+    BubbleChart.prototype.create_circles = function() {
+      var that;
       this.circles = this.vis.selectAll("circle").data(this.nodes, function(d) {
         return d.id;
       });
       that = this;
       this.circles.enter().append("circle").attr("r", 0).attr('class', (function(_this) {
         return function(d) {
-          return _this.get_supercategory(d.category);
+          return "" + (_this.get_supercategory(d.category)) + " " + d.reg_no;
         };
-      })(this)).attr("stroke-width", 2).attr("id", function(d) {
+      })(this)).attr("stroke-width", 2).attr('x', 1000).attr('y', 1000).attr("id", function(d) {
         return "bubble_" + d.id;
       }).on("mouseover", function(d, i) {
-        return that.show_details(d, i, this);
+        that.show_details(d, i, this);
+        return that.circles.filter((function(_this) {
+          return function(circle) {
+            return circle.reg_no !== d.reg_no;
+          };
+        })(this)).transition().duration(1000).style('opacity', 0.3);
       }).on("mouseout", function(d, i) {
-        return that.hide_details(d, i, this);
-      });
-      return this.circles.transition().duration(2000).attr("r", function(d) {
+        that.hide_details(d, i, this);
+        return that.circles.transition().duration(1000).style('opacity', 1);
+      }).transition().duration(3000).attr("r", function(d) {
         return d.radius;
       });
+      return this.circles.exit().remove();
     };
 
     BubbleChart.prototype.charge = function(d) {
       return -(Math.pow(d.radius, 2.0) / 7) + -(d.radius * 0.1) + -.3;
     };
 
-    BubbleChart.prototype.start = function() {
-      return this.force = d3.layout.force().nodes(this.nodes).size([this.width, this.height]);
-    };
-
     BubbleChart.prototype.display_group_all = function() {
-      this.force.gravity(this.layout_gravity).charge(this.charge).friction(0.9).on("tick", (function(_this) {
+      var center_label, force, formatted_total, radius, titles, total_amount;
+      this.kill_forces();
+      force = d3.layout.force().nodes(this.nodes).size([this.width, this.height]);
+      this.forces = [force];
+      radius = this.estimate_circle_diameter(this.nodes) / 2;
+      this.center = {
+        x: this.width / 2,
+        y: radius + 80
+      };
+      force.gravity(0).theta(1.1).charge(this.charge).chargeDistance(Infinity).friction(0.9).on("tick", (function(_this) {
         return function(e) {
           return _this.circles.each(_this.move_towards_center(e.alpha)).attr("cx", function(d) {
             return d.x;
@@ -155,7 +155,44 @@
           });
         };
       })(this));
-      return this.force.start();
+      force.start();
+      total_amount = d3.sum(this.nodes, function(d) {
+        return d.value;
+      });
+      formatted_total = this.format_money_millions(total_amount);
+      center_label = [
+        {
+          text: 'Total Campaign Spending',
+          "class": 'header',
+          dx: radius + 30,
+          dy: 80
+        }, {
+          text: formatted_total,
+          "class": 'amount',
+          dx: radius + 30,
+          dy: 100
+        }
+      ];
+      titles = this.vis.selectAll('text.titles').remove();
+      titles = this.vis.selectAll('text.titles').data(center_label, function(d) {
+        return d.text;
+      });
+      titles.enter().append('text').text(function(d) {
+        return d.text;
+      }).attr('class', (function(_this) {
+        return function(d) {
+          return "titles year " + d["class"];
+        };
+      })(this)).attr('x', (function(_this) {
+        return function(d) {
+          return _this.center.x + d.dx;
+        };
+      })(this)).attr('y', (function(_this) {
+        return function(d) {
+          return _this.center.y + d.dy;
+        };
+      })(this));
+      return titles.exit().remove();
     };
 
     BubbleChart.prototype.move_towards_center = function(alpha) {
@@ -167,44 +204,100 @@
       })(this);
     };
 
-    BubbleChart.prototype.display_by_year = function() {
-      this.force.gravity(this.layout_gravity).charge(this.charge).friction(0.9).on("tick", (function(_this) {
-        return function(e) {
-          return _this.circles.each(_this.move_towards_year(e.alpha)).attr("cx", function(d) {
-            return d.x;
-          }).attr("cy", function(d) {
-            return d.y;
-          });
-        };
-      })(this));
-      this.force.start();
-      return this.display_years();
-    };
-
     BubbleChart.prototype.split_amount = function() {};
 
-    BubbleChart.prototype.do_split = function(accessor) {
-      var location_map, titles;
+    BubbleChart.prototype.show_viz_type = function(func) {
+      var accessor;
+      if (func === 'candidate') {
+        this.do_split(function(d) {
+          return d.name;
+        });
+      }
+      if (func === 'party') {
+        this.do_split(function(d) {
+          return d.party;
+        });
+      }
+      if (func === 'expenditure') {
+        accessor = function(d) {
+          return d.super_category;
+        };
+        this.do_split(accessor, {
+          charge: (function(_this) {
+            return function(d) {
+              return _this.charge(d) * 1.3;
+            };
+          })(this)
+        });
+      }
+      if (func === 'office') {
+        this.do_split(function(d) {
+          return d.office;
+        });
+      }
+      if (func === 'amount') {
+        console.log('do nothing');
+      }
+      if (func === 'year') {
+        return this.display_group_all();
+      }
+    };
+
+    BubbleChart.prototype.do_split = function(accessor, options) {
+      var charge, force_map, line_height, line_offset, location_map, padding, titles;
+      if (options == null) {
+        options = {};
+      }
       location_map = this.move_to_location_map(this.nodes, accessor);
-      this.force.gravity(0).charge(this.charge).chargeDistance(300).friction(0.87).on("tick", (function(_this) {
-        return function(e) {
-          return _this.circles.each(_this.move_towards_candidates(e.alpha, location_map, accessor)).attr('cx', function(d) {
-            return d.x;
-          }).attr('cy', function(d) {
-            return d.y;
+      charge = options.charge != null ? options.charge : this.charge;
+      this.kill_forces();
+      this.forces = [];
+      force_map = location_map.keys().map((function(_this) {
+        return function(key) {
+          var force, nodes;
+          nodes = _this.nodes.filter(function(d) {
+            return key === accessor(d);
           });
+          force = d3.layout.force().nodes(nodes).size([_this.width, _this.height]);
+          _this.forces.push(force);
+          return {
+            force: force,
+            key: key,
+            nodes: nodes
+          };
         };
       })(this));
-      this.force.start();
+      force_map.forEach((function(_this) {
+        return function(force) {
+          var circles;
+          circles = _this.vis.selectAll("circle").filter(function(d) {
+            return force.key === accessor(d);
+          });
+          force.force.gravity(0).theta(1.0).charge(charge).chargeDistance(Infinity).friction(0.87).on("tick", function(e) {
+            return circles.each(_this.move_towards_candidates(e.alpha, location_map, accessor)).attr('cx', function(d) {
+              return d.x;
+            }).attr('cy', function(d) {
+              return d.y;
+            });
+          });
+          return force.force.start();
+        };
+      })(this));
+      titles = this.vis.selectAll('text.titles').remove();
       titles = this.vis.selectAll('text.titles').data(location_map.values(), function(d) {
         return d.key;
       });
+      padding = 55;
+      line_height = 20;
+      line_offset = function(d, line_num) {
+        return d.y + d.radius + padding + line_height * line_num;
+      };
       titles.enter().append('text').attr("class", "titles header").text(function(d) {
         return d.key;
       }).attr("text-anchor", "middle").attr('x', function(d) {
         return d.x;
       }).attr('y', function(d) {
-        return d.y + 200;
+        return line_offset(d, 0);
       });
       titles.enter().append('text').attr('class', 'titles amount').text((function(_this) {
         return function(d) {
@@ -213,13 +306,19 @@
       })(this)).attr('text-anchor', 'middle').attr('x', function(d) {
         return d.x;
       }).attr('y', function(d) {
-        return d.y + 220;
+        return line_offset(d, 1);
       });
       return titles.exit().remove();
     };
 
     BubbleChart.prototype.format_money_millions = function(amount_in_dollars) {
-      return d3.format('$,.2f')(amount_in_dollars / 1e6) + ' million';
+      var amount_in_millions;
+      amount_in_millions = amount_in_dollars / 1e6;
+      if (amount_in_millions <= 0.01) {
+        return "< $0.01 million";
+      } else {
+        return d3.format('$,.2f')(amount_in_millions) + ' million';
+      }
     };
 
     BubbleChart.prototype.move_towards_candidates = function(alpha, location_map, accessor) {
@@ -234,10 +333,10 @@
     };
 
     BubbleChart.prototype.move_to_location_map = function(nodes, grouping_func) {
-      var get_height, get_width, groupings_per_row, groups, i, min_grouping_height, min_grouping_width;
+      var col_num, get_height, get_width, groupings_per_row, groups, label_padding, max_num_in_row, max_num_rows, min_grouping_height, min_grouping_width, num_in_row, padding, prev_radius, prev_y;
       min_grouping_width = 300;
       groupings_per_row = Math.floor(this.width / min_grouping_width) - 1;
-      min_grouping_height = 350;
+      min_grouping_height = 450;
       get_width = (function(_this) {
         return function(i) {
           return ((i % groupings_per_row) + 1) * min_grouping_width;
@@ -256,22 +355,57 @@
             sum: d3.sum(leaves, function(d) {
               return parseFloat(d.value);
             }),
-            candidates: d3.set(leaves.map(_this.get_candidate_short_name)).values()
+            candidates: d3.set(leaves.map(_this.get_candidate_short_name)).values(),
+            radius: _this.estimate_circle_diameter(leaves) / 2
           };
         };
       })(this)).map(nodes, d3.map);
-      i = 0;
+      max_num_rows = 5;
+      padding = 30;
+      label_padding = 90;
+      col_num = prev_radius = 0;
+      num_in_row = 1;
+      max_num_in_row = 6;
+      prev_y = -60;
       groups.keys().sort(function(a, b) {
         return d3.descending(parseFloat(groups.get(a).sum), parseFloat(groups.get(b).sum));
-      }).forEach(function(key) {
-        var entry;
-        entry = groups.get(key);
-        entry['key'] = key;
-        entry['x'] = get_width(i);
-        entry['y'] = get_height(i);
-        groups.set(key, entry);
-        return i += 1;
-      });
+      }).forEach((function(_this) {
+        return function(key, index) {
+          var entry, min_width, num_left_in_layout, prev_num_in_row, x, y;
+          entry = groups.get(key);
+          entry['key'] = key;
+          if (col_num >= num_in_row) {
+            col_num = 0;
+          }
+          if (col_num === 0) {
+            prev_num_in_row = num_in_row;
+            while ((_this.width / num_in_row) > entry.radius * 2 + padding * 3) {
+              num_in_row += 1;
+            }
+            num_in_row -= 1;
+            num_left_in_layout = groups.keys().length - index;
+            if (num_in_row > num_left_in_layout) {
+              if (!(num_left_in_layout > groups.keys().length - 1)) {
+                num_in_row = prev_num_in_row;
+              }
+            }
+            num_in_row = Math.min(max_num_in_row, num_in_row);
+          }
+          min_width = _this.width / num_in_row;
+          x = min_width * col_num + min_width / 2;
+          if (col_num === 0) {
+            y = prev_y + prev_radius + entry.radius + padding * 2 + label_padding;
+            prev_y = y;
+            prev_radius = entry.radius;
+          }
+          y = prev_y;
+          entry['x'] = x;
+          entry['y'] = y;
+          entry['radius'] = prev_radius;
+          groups.set(key, entry);
+          return col_num += 1;
+        };
+      })(this));
       return groups;
     };
 
@@ -295,6 +429,16 @@
       return d.name.split(',')[0] + (" (" + d.party[0] + ")");
     };
 
+    BubbleChart.prototype.estimate_circle_diameter = function(nodes) {
+      var area, diameter, estimated_diameter;
+      area = d3.sum(nodes, function(d) {
+        return Math.PI * Math.pow(d.radius, 2);
+      });
+      diameter = 2 * Math.sqrt(area / Math.PI);
+      estimated_diameter = (Math.log(nodes.length) / 140 + 1) * diameter;
+      return estimated_diameter;
+    };
+
     BubbleChart.prototype.move_towards_year = function(alpha) {
       return (function(_this) {
         return function(d) {
@@ -311,7 +455,7 @@
       d3.select(element).attr("stroke", "black");
       content = "<div class=\"inner_tooltip\">";
       content += "<span class=\"candidate\">" + data.name + "</span><br/>";
-      content += "" + data.election_year + ", " + data.office + "<br/>";
+      content += "<span class=\"office\">" + data.election_year + ", " + data.office + "</span><br/>";
       content += "<span class=\"amount\"> " + data.category + " $" + (addCommas(data.value)) + "</span><br/>";
       content += "</div>";
       this.tooltip.showTooltip(content, d3.event);
@@ -329,9 +473,12 @@
 
   root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
+  campaignInit = function() {};
+
   $(function() {
     var chart, filter_data, join_data, render_vis;
     chart = null;
+    campaignInit();
     join_data = function(expend_recs, org_recs) {
       var expend_rec, full_records, i, j, org_rec;
       full_records = [];
@@ -352,10 +499,22 @@
       }
       return full_records;
     };
-    filter_data = function(records) {
+    filter_data = function(records, year) {
       var filtered_csv, reduced, sorted;
       filtered_csv = records.filter(function(d) {
-        return d.election_period === '2012-2014';
+        if (parseInt(d.amount) < 0) {
+          return false;
+        } else if (year === 2014) {
+          return d.election_period === '2012-2014';
+        } else if (year === 2012) {
+          return d.election_period === '2010-2012';
+        } else if (year === 2010) {
+          return d.election_period === '2008-2010';
+        } else if (year === 2008) {
+          return d.election_period === '2006-2008';
+        } else {
+          return false;
+        }
       });
       sorted = filtered_csv.sort(function(a, b) {
         return d3.descending(parseFloat(a.amount), parseFloat(b.amount));
@@ -376,66 +535,94 @@
       filtered_csv;
       return sorted;
     };
+    root.update_year = function(next) {
+      var $year_el, cur_year, direction, filtered_records, next_year, range, records;
+      records = window.raw_records;
+      $year_el = $('.viz_nav.year');
+      cur_year = $year_el.data('year');
+      direction = next ? 1 : -1;
+      next_year = cur_year + 2 * direction;
+      if (next_year === 2008) {
+        $('.time_nav.left').animate({
+          color: '#bcbbb4'
+        }).removeClass('clickable');
+      } else {
+        $('.time_nav.left').animate({
+          color: '#454542'
+        }).addClass('clickable');
+      }
+      if (next_year === 2014) {
+        $('.time_nav.right').animate({
+          color: '#bcbbb4'
+        }).removeClass('clickable');
+      } else {
+        $('.time_nav.right').animate({
+          color: '#454542'
+        }).addClass('clickable');
+      }
+      range = d3.range(2008, 2014.1, 2);
+      if (__indexOf.call(range, next_year) < 0) {
+        return;
+      }
+      $year_el.animate({
+        color: 'white'
+      }, {
+        complete: function() {
+          $year_el.text(next_year);
+          $year_el.data('year', next_year);
+          return $year_el.animate({
+            color: '#454542'
+          });
+        }
+      });
+      filtered_records = filter_data(records, next_year);
+      window.debug_now = true;
+      window.records = filtered_records;
+      return chart.update_data(filtered_records);
+    };
     render_vis = function(error, expenditure_records, organizational_records) {
       var filtered_records, raw_records;
       raw_records = join_data(expenditure_records, organizational_records);
-      filtered_records = filter_data(raw_records);
+      window.raw_records = raw_records;
+      filtered_records = filter_data(raw_records, 2014);
       window.records = filtered_records;
       chart = new BubbleChart(filtered_records);
-      chart.start();
-      return root.display_all();
+      return chart.display_group_all();
     };
-    root.display_all = (function(_this) {
-      return function() {
-        return chart.display_group_all();
-      };
-    })(this);
     root.get_chart = (function(_this) {
       return function() {
         return chart;
       };
     })(this);
-    root.display_year = (function(_this) {
-      return function() {
-        return chart.display_by_year();
-      };
-    })(this);
-    root.toggle_view = (function(_this) {
-      return function(view_type) {
-        if (view_type === 'year') {
-          return root.display_year();
-        } else {
-          return root.display_all();
-        }
-      };
-    })(this);
     $('#viz_nav_container .viz_nav').on('click', function(e) {
-      var $target, func;
+      var $viz_nav, currentFunc, func;
       e.preventDefault();
-      $target = $(e.target);
-      func = $target.data('name');
-      if (func === 'candidate') {
-        window.get_chart().do_split(function(d) {
-          return d.name;
-        });
+      $viz_nav = $(e.target).closest('.viz_nav');
+      func = $viz_nav.data('name');
+      currentFunc = $('.viz_nav.btn.selected').data('name');
+      $viz_nav.animate({
+        backgroundColor: '#73884f'
+      });
+      $viz_nav.animate({
+        backgroundColor: '#FFFFFF'
+      });
+      if (func !== currentFunc) {
+        $viz_nav.siblings('.btn').removeClass('selected');
+        $viz_nav.addClass('selected');
+        return window.get_chart().show_viz_type(func);
+      } else {
+        $viz_nav.removeClass('selected');
+        return window.get_chart().show_viz_type('year');
       }
-      if (func === 'party') {
-        window.get_chart().do_split(function(d) {
-          return d.party;
-        });
+    });
+    $('.time_nav.right').on('click', function(e) {
+      if ($(this).hasClass('clickable')) {
+        return window.update_year(true);
       }
-      if (func === 'expenditure') {
-        window.get_chart().do_split(function(d) {
-          return d.super_category;
-        });
-      }
-      if (func === 'office') {
-        window.get_chart().do_split(function(d) {
-          return d.office;
-        });
-      }
-      if (func === 'amount') {
-        return window.get_chart().split_amount();
+    });
+    $('.time_nav.left').on('click', function(e) {
+      if ($(this).hasClass('clickable')) {
+        return window.update_year(false);
       }
     });
     return queue().defer(d3.csv, "data/campaign_spending_summary.csv").defer(d3.csv, "data/organizational_report.csv").await(render_vis);
