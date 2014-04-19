@@ -268,9 +268,31 @@
             return "< $1,000";
           }
         };
-        sort_func = function(d) {
-          console.log('doing sort');
-          return -1;
+        sort_func = function(a, b) {
+          var get_amount;
+          get_amount = function(d) {
+            var $_pos, amount_str, end_pos;
+            $_pos = d.indexOf('$') + 1;
+            end_pos = d.indexOf(' ', $_pos);
+            amount_str = d.substring($_pos, end_pos);
+            return parseInt(amount_str.replace(/,/g, ''));
+          };
+          if (a === "Over a million") {
+            return -1;
+          }
+          if (b === "Over a million") {
+            return 1;
+          }
+          if (a === "< $1,000") {
+            return 1;
+          }
+          if (b === "< $1,000") {
+            return -1;
+          }
+          console.log("a " + a + "\tb " + b);
+          console.log("a " + (get_amount(a)) + "\tb " + (get_amount(b)));
+          console.log("");
+          return d3.descending(get_amount(a), get_amount(b));
         };
         this.do_split(accessor, {
           sort: sort_func,
