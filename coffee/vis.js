@@ -207,7 +207,7 @@
     BubbleChart.prototype.split_amount = function() {};
 
     BubbleChart.prototype.show_viz_type = function(func) {
-      var accessor;
+      var accessor, sort_func;
       if (func === 'candidate') {
         this.do_split(function(d) {
           return d.name;
@@ -237,6 +237,45 @@
       }
       if (func === 'amount') {
         console.log('do nothing');
+        accessor = function(d) {
+          if (d.value > 1e6) {
+            return "Over a million";
+          } else if (d.value > 500000) {
+            return "$500,000 to 1 million";
+          } else if (d.value > 250000) {
+            return "$250,000 to 500,000";
+          } else if (d.value > 200000) {
+            return "$200,000 to $250,000";
+          } else if (d.value > 150000) {
+            return "$150,000 to 200,000";
+          } else if (d.value > 100000) {
+            return "$100,000 to 150,000";
+          } else if (d.value > 50000) {
+            return "$50,000 to 100,000";
+          } else if (d.value > 25000) {
+            return "$25,000 to 50,000";
+          } else if (d.value > 20000) {
+            return "$20,000 to 25,000";
+          } else if (d.value > 15000) {
+            return "$15,000 to 20,000";
+          } else if (d.value > 10000) {
+            return "$10,000 to 15,000";
+          } else if (d.value > 5000) {
+            return "$5,000 to 10,000";
+          } else if (d.value > 1000) {
+            return "$1,000 to 5,000";
+          } else {
+            return "< $1,000";
+          }
+        };
+        sort_func = function(d) {
+          console.log('doing sort');
+          return -1;
+        };
+        this.do_split(accessor, {
+          sort: sort_func,
+          view_by_amount: true
+        });
       }
       if (func === 'year') {
         return this.display_group_all();
@@ -248,7 +287,7 @@
       if (options == null) {
         options = {};
       }
-      location_map = this.move_to_location_map(this.nodes, accessor);
+      location_map = this.move_to_location_map(this.nodes, accessor, options);
       charge = options.charge != null ? options.charge : this.charge;
       this.kill_forces();
       this.forces = [];
@@ -287,7 +326,7 @@
       titles = this.vis.selectAll('text.titles').data(location_map.values(), function(d) {
         return d.key;
       });
-      padding = 55;
+      padding = options.view_by_amount != null ? padding = 90 : padding = 55;
       line_height = 20;
       line_offset = function(d, line_num) {
         return d.y + d.radius + padding + line_height * line_num;
@@ -332,8 +371,11 @@
       })(this);
     };
 
-    BubbleChart.prototype.move_to_location_map = function(nodes, grouping_func) {
-      var col_num, get_height, get_width, groupings_per_row, groups, label_padding, max_num_in_row, max_num_rows, min_grouping_height, min_grouping_width, num_in_row, padding, prev_radius, prev_y;
+    BubbleChart.prototype.move_to_location_map = function(nodes, grouping_func, options) {
+      var col_num, get_height, get_width, groupings_per_row, groups, label_padding, max_num_in_row, max_num_rows, min_grouping_height, min_grouping_width, num_in_row, padding, prev_radius, prev_y, sort;
+      if (options == null) {
+        options = {};
+      }
       min_grouping_width = 300;
       groupings_per_row = Math.floor(this.width / min_grouping_width) - 1;
       min_grouping_height = 450;
@@ -361,15 +403,16 @@
         };
       })(this)).map(nodes, d3.map);
       max_num_rows = 5;
-      padding = 30;
+      padding = options.view_by_amount != null ? 80 : 30;
       label_padding = 90;
       col_num = prev_radius = 0;
       num_in_row = 1;
       max_num_in_row = 6;
-      prev_y = -60;
-      groups.keys().sort(function(a, b) {
+      prev_y = options.view_by_amount != null ? -90 : -60;
+      sort = options.sort != null ? options.sort : function(a, b) {
         return d3.descending(parseFloat(groups.get(a).sum), parseFloat(groups.get(b).sum));
-      }).forEach((function(_this) {
+      };
+      groups.keys().sort(sort).forEach((function(_this) {
         return function(key, index) {
           var entry, min_width, num_left_in_layout, prev_num_in_row, x, y;
           entry = groups.get(key);
