@@ -1,5 +1,5 @@
 (function() {
-  var BubbleChart, campaignInit, root,
+  var BubbleChart, CandidateModal, campaignInit, root,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -536,9 +536,40 @@
 
   })();
 
+  CandidateModal = (function() {
+    function CandidateModal(data, i, element) {
+      var matched, reg_no;
+      reg_no = data.reg_no;
+      matched = window.records.filter(function(d) {
+        return d.reg_no === reg_no;
+      });
+      debugger;
+    }
+
+    CandidateModal.prototype.render = function() {
+      var modal;
+      modal = $('#candidate_modal');
+      return modal.foundation('reveal', 'open');
+    };
+
+    return CandidateModal;
+
+  })();
+
   root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
-  campaignInit = function() {};
+  campaignInit = function() {
+    $('.legend_hover_area').on('mouseenter', function() {
+      return $('.legend').animate({
+        right: 0
+      });
+    });
+    return $('.legend').on('mouseleave', function() {
+      return $('.legend').animate({
+        right: '-225px'
+      });
+    });
+  };
 
   $(function() {
     var chart, filter_data, join_data, render_vis;
