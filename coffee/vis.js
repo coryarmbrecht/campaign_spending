@@ -289,9 +289,6 @@
           if (b === "< $1,000") {
             return -1;
           }
-          console.log("a " + a + "\tb " + b);
-          console.log("a " + (get_amount(a)) + "\tb " + (get_amount(b)));
-          console.log("");
           return d3.descending(get_amount(a), get_amount(b));
         };
         this.do_split(accessor, {
@@ -564,10 +561,26 @@
         right: 0
       });
     });
-    return $('.legend').on('mouseleave', function() {
+    $('.legend').on('mouseleave', function() {
       return $('.legend').animate({
         right: '-225px'
       });
+    });
+    $('.legend .row[data-category]').on('mouseenter', function() {
+      var category, circles;
+      category = $(this).data('category');
+      console.log('mouseenter category ' + category);
+      circles = d3.selectAll('circle');
+      return circles.filter(function(circle) {
+        return circle.super_category !== category;
+      }).transition().duration(1000).style('opacity', 0.3);
+    });
+    return $('.legend .row[data-category]').on('mouseleave', function() {
+      var category, circles;
+      category = $(this).data('category');
+      console.log('mouseleave category ' + category);
+      circles = d3.selectAll('circle');
+      return circles.transition().duration(1000).style('opacity', 1);
     });
   };
 
