@@ -5,7 +5,7 @@
     <title>Hawaii Campaign Spending Data</title>
     <link rel="stylesheet" href="css/foundation.css" />
     <!--<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>-->
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,400,700,600' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,300,400,700,600' rel='stylesheet' type='text/css'>
     <script src="js/vendor/modernizr.js"></script>
     <!--<script src="//ajax.googleapis.com/ajax/libs/webfont/1.4.7/webfont.js"></script>-->
     <script>
@@ -103,7 +103,7 @@
 
     <br />
     <div class="row full-width">
-      <div class="large-12 columns">
+      <div id="vis-container" class="large-12 columns">
         <div id="vis"></div>
       </div>
     </div>
@@ -194,6 +194,7 @@
     <script type="text/javascript" src="js/foundation.min.js"></script>
     <!--
     <script type="text/javascript" src="js/dat.gui.min.js"></script>
+    <script type="text/javascript" src="js/d3.v3.js"></script>
     -->
     <script type="text/javascript" src="js/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/util.js"></script>
@@ -201,7 +202,9 @@
     <script type="text/javascript" src="js/d3.tip.v0.6.3.js"></script>
     <script type="text/javascript" src="js/libs/jquery.animate-colors-min.js"></script>
 
+    <!--
     <script defer src="js/plugins.js"></script>
+    -->
     <script defer src="js/script.js"></script>
     <script src="js/CustomTooltip.js"></script>
     <!--
@@ -222,6 +225,27 @@
 
     </script>
 
+    <div id="candidate_modal" class="reveal-modal" data-reveal>
+      <div class='candidate_info'>
+        <div class='candidate_name'></div>
+        <div class='candidate_subtitle'>
+          <span class='current_year'></span>, <span class='candidate_office'></span>
+        </div>
+        <div class='expenditure_category_title'></div>
+      </div>
+      <div id="candidate_vis"></div>
+
+      <hr>
+      <a class="close-reveal-modal">&#215;</a>
+      <div class='expenditure-loading'>
+        <img src='images/spinner.gif' />
+        Expenditure Records Loading
+      </div>
+      <div class='hidden expenditure-error'>
+        Error loading expenditures from Socrata
+      </div>
+      <div id='expenditure-record-table-container'></div>
+    </div>
     <script>
       $(document).foundation();
     </script>

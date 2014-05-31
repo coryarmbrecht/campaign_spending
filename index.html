@@ -1,11 +1,20 @@
 <!doctype html>
-<html class="no-js" lang="en">
-  <head>
+<html class="no-js" lang="en"> <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Foundation | Welcome</title>
+    <title>Hawaii Campaign Spending Data</title>
     <link rel="stylesheet" href="css/foundation.css" />
+    <!--<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>-->
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,300,400,700,600' rel='stylesheet' type='text/css'>
     <script src="js/vendor/modernizr.js"></script>
+    <!--<script src="//ajax.googleapis.com/ajax/libs/webfont/1.4.7/webfont.js"></script>-->
+    <script>
+//      WebFont.load({
+//        google: {
+//          families: ['Open Sans']
+//        }
+//      });
+    </script>
     <script type="text/javascript">
       function export_svg() {
         $('svg').svg();
@@ -16,8 +25,8 @@
     <!-- Styles don't flow into exported SVG, so only use for web -->
     <link rel="stylesheet" type="text/css" href="css/durable_assets.css">
   </head>
-  <body>
-    <a href="https://github.com/axelson/campaign_spending"><img style="position: absolute; top: 45px; left: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_left_darkblue_121621.png" alt="Fork me on GitHub"></a>
+  <body id='candidate_spending_container'>
+    <a href="https://github.com/axelson/campaign_spending"><img style="position: absolute; top: 65px; left: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_left_darkblue_121621.png" alt="Fork me on GitHub"></a>
     <nav class="top-bar" data-topbar>
   <ul class="title-area">
     <li class="name">
@@ -49,73 +58,197 @@
   </section>
 </nav>
 
+
     <div class="row">
       <div class="large-12 columns">
-        <h1>Durable Asset Visualization</h1>
+          <div class="time_nav left clickable unselectable">
+            <div class="time_arrow"> &lt; </div>
+            <div class="time_buttons">
+              <div>prev<br/>year</div>
+            </div>
+          </div>
+          <div class="time_nav right unselectable">
+            <div class="time_arrow"> &gt; </div>
+            <div class="time_buttons">
+              <div>next<br/>year</div>
+            </div>
+          </div>
+        <div id="viz_nav_container">
+          <div id="viz_nav_inner_container">
+            <div class="viz_nav year selected" data-name="year" data-year='2014'> 2014 </div>
+            <div class="viz_nav btn" data-name="office">
+              <div class="sub_header">View by</div>
+              <div class="header">Office</div>
+            </div>
+            <div class="viz_nav btn" data-name="expenditure">
+              <div class="sub_header">View by</div>
+              <div class="header">Expenditure</div>
+            </div>
+            <div class="viz_nav btn" data-name="candidate">
+              <div class="sub_header">View by</div>
+              <div class="header">Candidate</div>
+            </div>
+            <div class="viz_nav btn" data-name="party">
+              <div class="sub_header">View by</div>
+              <div class="header">Party</div>
+            </div>
+            <div class="viz_nav btn" data-name="amount">
+              <div class="sub_header">View by</div>
+              <div class="header">Amount</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <br />
-    <br />
-    <br />
-    <br />
-    <br />
-    <br />
-    <br />
     <br />
     <div class="row full-width">
-      <div class="large-8 columns">
-        <div id="chart_div">
-          <svg id='chart-container'></svg>
-          <div><div id='reset_colors_btn' class='button'>Reset Colors</div></div>
-        </div>
-      </div>
-      <div class="large-4 columns">
-        <div class="row">
-          <ul class="button-group radius y-axis-buttons">
-            <li><a class="button" data-filter="depreciation_per_day" href="#"> depreciation/day </a></li>
-            <li><a class="button selected" data-filter="days_till_zero_value" href="#"> days till $0 </a></li>
-          </ul>
-        </div>
-        <div class="row">
-          <ul class="button-group radius filter-buttons">
-            <li><a class="button" data-filter="< 500" href="#"> < 500 </a></li>
-            <li><a class="button selected" data-filter="all" href="#"> all </a></li>
-            <li><a class="button" data-filter="> 500" href="#"> > 500 </a></li>
-          </ul>
-        </div>
-        <div class="row">
-          <div id='candidate-container'></div>
-        </div>
+      <div id="vis-container" class="large-12 columns">
+        <div id="vis"></div>
       </div>
     </div>
-    <div class="row">
-      <div class="large-12 columns">
-        <button onclick="export_svg();" />export</button>
-        <pre><div id="svgexport">export will go here</div></pre>
+    <div class='legend_container'>
+      <!-- TODO: make extend above and below panel -->
+      <div class='legend_hover_area'></div>
+      <div class='legend'>
+        <div class='row'>
+          <div class='large-12 columns'>
+            <div class='header'>Spending Categories</div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
+        <div class='row' data-category='communication'>
+          <div class='large-2 columns'><div class='key communication'></div></div>
+          <div class='large-10 columns'>
+            <div class='subheader'>
+              Communication & Outreach
+            </div>
+            <div class='subcategories'>
+              Advertising, Candidate Fundraiser Tickers, Postage/Mailing, Printing, Surveys, Polls & Voter Lists
+            </div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
+        <div class='row' data-category='overhead'>
+          <div class='large-2 columns'><div class='key overhead'></div></div>
+          <div class='large-10 columns'>
+            <div class='subheader'>
+              Overhead
+            </div>
+            <div class='subcategories'>
+              Durable Assets, Food & Beverage, Insurance, Lease/Rent, Office Supplies, Travel & Lodging, Utilities, Vehicle
+            </div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
+        <div class='row' data-category='staff'>
+          <div class='large-2 columns'><div class='key staff'></div></div>
+          <div class='large-10 columns'>
+            <div class='subheader'>
+              Staff & Professional Services
+            </div>
+            <div class='subcategories'>
+              Employee Services, Professional Services
+            </div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
+        <div class='row' data-category='contributions'>
+          <div class='large-2 columns'><div class='key contributions'></div></div>
+          <div class='large-10 columns'>
+            <div class='subheader'>
+              Contributions
+            </div>
+            <div class='subcategories'>
+              Contribution to Community Organization, Contribution to Political Party, Hawaii Election Campaign Fund
+            </div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
+        <div class='row' data-category='fees'>
+          <div class='large-2 columns'><div class='key fees'></div></div>
+          <div class='large-10 columns'>
+            <div class='subheader'>
+              Taxes & Fees
+            </div>
+            <div class='subcategories'>
+              Bank Charges & Adjustments, Filing Fee, Taxes
+            </div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
+        <div class='row' data-category='other'>
+          <div class='large-2 columns'><div class='key other'></div></div>
+          <div class='large-10 columns'>
+            <div class='subheader'>
+              Other
+            </div>
+          </div>
+        </div>
+        <div class='row section'><div class='large-12 columns'><div class='border'></div></div></div>
       </div>
     </div>
 
-    <div class="row full-width">
-      <div class="large-12 columns">
-        <div id='table-container'></div>
-      </div>
-    </div>
-
-
-    <!-- TODO: Make this a common template -->
     <script type="text/javascript" src="js/vendor/jquery.js"></script>
     <script type="text/javascript" src="js/jquery.svg.js"></script>
     <script type="text/javascript" src="js/foundation.min.js"></script>
+    <!--
     <script type="text/javascript" src="js/dat.gui.min.js"></script>
+    <script type="text/javascript" src="js/d3.v3.js"></script>
+    -->
     <script type="text/javascript" src="js/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/util.js"></script>
     <script type="text/javascript" src="js/common.js"></script>
-    <script type="text/javascript" src="js/durable_assets.js"></script>
     <script type="text/javascript" src="js/d3.tip.v0.6.3.js"></script>
+    <script type="text/javascript" src="js/libs/jquery.animate-colors-min.js"></script>
+
+    <!--
+    <script defer src="js/plugins.js"></script>
+    -->
+    <script defer src="js/script.js"></script>
+    <script src="js/CustomTooltip.js"></script>
+    <!--
+    <script src="js/libs/coffee-script.js"></script>
+    <script src="js/libs/d3.geom.min.js"></script>
+    -->
+    <script type="text/javascript" src="coffee/vis.js"></script>
+    <script type="text/javascript" src="js/lodash_2.4.1.js"></script>
+    <script type="text/javascript" src="js/libs/queue.v1.min.js"></script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-50186636-1', 'axelson.github.io');
+      ga('send', 'pageview');
+
+    </script>
+
+    <div id="candidate_modal" class="reveal-modal" data-reveal>
+      <div class='candidate_info'>
+        <div class='candidate_name'></div>
+        <div class='candidate_subtitle'>
+          <span class='current_year'></span>, <span class='candidate_office'></span>
+        </div>
+        <div class='expenditure_category_title'></div>
+      </div>
+      <div id="candidate_vis"></div>
+
+      <hr>
+      <a class="close-reveal-modal">&#215;</a>
+      <div class='expenditure-loading'>
+        <img src='images/spinner.gif' />
+        Expenditure Records Loading
+      </div>
+      <div class='hidden expenditure-error'>
+        Error loading expenditures from Socrata
+      </div>
+      <div id='expenditure-record-table-container'></div>
+    </div>
     <script>
       $(document).foundation();
     </script>
-    <div class='hidden' id='app-info' data-page='durable-assets' />
+    <div class='hidden' id='app-info' data-page='campaign-spending' />
   </body>
 </html>

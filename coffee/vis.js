@@ -1,10 +1,12 @@
 (function() {
-  var BubbleChart, CandidateModal, campaignInit, root,
+  var BubbleChart, CandidateUtil, campaignInit, root,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   BubbleChart = (function() {
     function BubbleChart(data) {
+      this.update_modal = __bind(this.update_modal, this);
+      this.render_modal = __bind(this.render_modal, this);
       this.hide_details = __bind(this.hide_details, this);
       this.show_details = __bind(this.show_details, this);
       this.move_towards_year = __bind(this.move_towards_year, this);
@@ -16,9 +18,9 @@
       this.format_money_millions = __bind(this.format_money_millions, this);
       this.do_split = __bind(this.do_split, this);
       this.show_viz_type = __bind(this.show_viz_type, this);
-      this.split_amount = __bind(this.split_amount, this);
       this.move_towards_center = __bind(this.move_towards_center, this);
       this.display_group_all = __bind(this.display_group_all, this);
+      this.do_create_circles = __bind(this.do_create_circles, this);
       this.create_circles = __bind(this.create_circles, this);
       this.create_vis = __bind(this.create_vis, this);
       this.update_data = __bind(this.update_data, this);
@@ -28,6 +30,8 @@
       this.data = data;
       this.width = 1350;
       this.height = 3500;
+      window.width = this.width;
+      window.height = this.height;
       this.tooltip = CustomTooltip("expenditure_tooltip", 300);
       this.damper = 0.1;
       this.vis = null;
@@ -59,6 +63,7 @@
             category: d.expenditure_category,
             super_category: _this.get_supercategory(d.expenditure_category),
             office: d.office,
+            district: d.district,
             election_period: d.election_period,
             election_year: d.election_period.split('-')[1],
             x: Math.random() * 1,
@@ -101,20 +106,25 @@
 
     BubbleChart.prototype.create_vis = function() {
       this.vis = d3.select("#vis").append("svg").attr("width", this.width).attr("height", this.height).attr("id", "svg_vis");
+      window.viz = this.vis;
       return this.create_circles();
     };
 
     BubbleChart.prototype.create_circles = function() {
-      var that;
       this.circles = this.vis.selectAll("circle").data(this.nodes, function(d) {
         return d.id;
       });
+      return this.do_create_circles(this.circles);
+    };
+
+    BubbleChart.prototype.do_create_circles = function(circles) {
+      var that;
       that = this;
-      this.circles.enter().append("circle").attr("r", 0).attr('class', (function(_this) {
+      circles.enter().append("circle").attr('class', (function(_this) {
         return function(d) {
           return "" + (_this.get_supercategory(d.category)) + " " + d.reg_no;
         };
-      })(this)).attr("stroke-width", 2).attr('x', 1000).attr('y', 1000).attr("id", function(d) {
+      })(this)).attr("stroke-width", 2).attr("id", function(d) {
         return "bubble_" + d.id;
       }).on("mouseover", function(d, i) {
         that.show_details(d, i, this);
@@ -126,10 +136,24 @@
       }).on("mouseout", function(d, i) {
         that.hide_details(d, i, this);
         return that.circles.transition().duration(1000).style('opacity', 1);
+      }).on("click", function(d, i) {
+        var element, modal;
+        modal = $('#candidate_modal');
+        element = this;
+        $(document).off('opened', '[data-reveal]');
+        $(document).on('opened', '[data-reveal]', function() {
+          var callback_modal;
+          callback_modal = $(this);
+          if (callback_modal.attr('id') === modal.attr('id')) {
+            return that.render_modal(d, i, element);
+          }
+        });
+        $(element).data('center', true);
+        return modal.foundation('reveal', 'open');
       }).transition().duration(3000).attr("r", function(d) {
         return d.radius;
       });
-      return this.circles.exit().remove();
+      return circles.exit().remove();
     };
 
     BubbleChart.prototype.charge = function(d) {
@@ -204,10 +228,8 @@
       })(this);
     };
 
-    BubbleChart.prototype.split_amount = function() {};
-
     BubbleChart.prototype.show_viz_type = function(func) {
-      var accessor, sort_func;
+      var accessor, category_titles, sort_func;
       if (func === 'candidate') {
         this.do_split(function(d) {
           return d.name;
@@ -219,6 +241,14 @@
         });
       }
       if (func === 'expenditure') {
+        category_titles = {
+          communication: 'Communication & Outreach',
+          overhead: 'Overhead',
+          staff: 'Staff & Professional Services',
+          contributions: 'Contributions',
+          fees: 'Taxes & Fees',
+          other: 'Other'
+        };
         accessor = function(d) {
           return d.super_category;
         };
@@ -227,7 +257,15 @@
             return function(d) {
               return _this.charge(d) * 1.3;
             };
-          })(this)
+          })(this),
+          title_accessor: function(category) {
+            return category_titles[category];
+          }
+        });
+      }
+      if (func === 'island') {
+        this.do_split(function(d) {
+          return candidate_utils.get_island(d);
         });
       }
       if (func === 'office') {
@@ -302,7 +340,7 @@
     };
 
     BubbleChart.prototype.do_split = function(accessor, options) {
-      var charge, force_map, line_height, line_offset, location_map, padding, titles;
+      var charge, force_map, line_height, line_offset, location_map, padding, title_accessor, titles;
       if (options == null) {
         options = {};
       }
@@ -342,6 +380,11 @@
         };
       })(this));
       titles = this.vis.selectAll('text.titles').remove();
+      title_accessor = options.title_accessor != null ? function(d) {
+        return options.title_accessor(d.key);
+      } : function(d) {
+        return d.key;
+      };
       titles = this.vis.selectAll('text.titles').data(location_map.values(), function(d) {
         return d.key;
       });
@@ -350,9 +393,7 @@
       line_offset = function(d, line_num) {
         return d.y + d.radius + padding + line_height * line_num;
       };
-      titles.enter().append('text').attr("class", "titles header").text(function(d) {
-        return d.key;
-      }).attr("text-anchor", "middle").attr('x', function(d) {
+      titles.enter().append('text').attr("class", "titles header").text(title_accessor).attr("text-anchor", "middle").attr('x', function(d) {
         return d.x;
       }).attr('y', function(d) {
         return line_offset(d, 0);
@@ -529,31 +570,176 @@
       return this.tooltip.hideTooltip();
     };
 
+    BubbleChart.prototype.render_modal = function(circle_data, i, element) {
+      var center_node, circles, force, largest_radius, link_distance, links, modal_viz_height, modal_viz_padding, modal_viz_width, nodes, non_center_nodes, records, reg_no, tick, viz;
+      this.kill_forces();
+      $('#candidate_vis').find('svg').remove();
+      $('#candidate_modal').find('#expenditure-record-table-container').empty();
+      reg_no = circle_data.reg_no;
+      records = window.records.filter(function(d) {
+        return d.reg_no === reg_no;
+      });
+      nodes = window.viz.selectAll('circle').filter((function(_this) {
+        return function(d) {
+          return d.reg_no === reg_no;
+        };
+      })(this)).data();
+      center_node = nodes.filter(function(d) {
+        return circle_data.category === d.category;
+      })[0];
+      non_center_nodes = nodes.filter(function(d) {
+        return circle_data.category !== d.category;
+      });
+      largest_radius = d3.max(non_center_nodes, function(d) {
+        return d.radius;
+      });
+      links = non_center_nodes.map(function(node) {
+        return {
+          source: center_node,
+          target: node
+        };
+      });
+      link_distance = Math.max(40, center_node.radius) + 55;
+      modal_viz_padding = 5;
+      modal_viz_height = link_distance * 2.05 + largest_radius * 4 + modal_viz_padding * 2;
+      modal_viz_width = $('#candidate_vis').width();
+      viz = d3.select('#candidate_vis').append('svg').attr('width', '100%').attr('height', modal_viz_height);
+      circles = viz.selectAll('circle').data(nodes, function(d) {
+        return d.id;
+      });
+      this.do_create_circles(circles);
+      circles.filter(function(node) {
+        return node.category !== circle_data.category;
+      }).transition().duration(1000).style('opacity', 0.5);
+      circles.attr('cx', function(d) {
+        return d.x;
+      }).attr('cy', function(d) {
+        return d.y;
+      });
+      tick = function() {
+        return circles.attr("cx", function(d) {
+          return d.x;
+        }).attr("cy", function(d) {
+          return d.y;
+        });
+      };
+      force = d3.layout.force().size([modal_viz_width, modal_viz_height]).nodes(nodes).links(links).friction(0.7).theta(0.5).gravity(0.2).charge(function(d) {
+        return -300 + -100 * Math.log(d.radius);
+      }).linkDistance(link_distance).on('tick', tick).start();
+      return this.update_modal(reg_no, circle_data.category);
+    };
+
+    BubbleChart.prototype.update_modal = function(reg_no, category) {
+      var candidate_info, candidate_name, candidate_office, cur_year, election_period, encoded_category, modal, url, url_params, year;
+      console.log('updating modal');
+      url = 'https://data.hawaii.gov/resource/3maa-4fgr.json';
+      encoded_category = encodeURIComponent(category);
+      year = candidate_utils.get_vis_year();
+      election_period = "" + (year - 2) + "-" + year;
+      url_params = "$limit=20&$where=reg_no='" + reg_no + ("'and expenditure_category='" + encoded_category + "' and election_period = '") + election_period + "'&$order=amount desc";
+      modal = $('#candidate_modal');
+      modal.find('.expenditure-loading').show();
+      $.get("" + url + "?" + url_params, function(data) {
+        var columns;
+        columns = [
+          {
+            name: 'date',
+            display_name: 'Date',
+            func: function(d) {
+              return d.substring(0, 10);
+            }
+          }, {
+            name: 'expenditure_category',
+            display_name: 'Expenditure Category'
+          }, {
+            name: 'vendor_name',
+            display_name: 'Vendor Name'
+          }, {
+            name: 'purpose_of_expenditure',
+            display_name: 'Purpose of Expenditure'
+          }, {
+            name: 'amount',
+            display_name: 'Amount',
+            func: function(d) {
+              return money(d);
+            }
+          }
+        ];
+        return tabulate('#candidate_modal #expenditure-record-table-container', 'expenditure-record-table', data, columns);
+      }).always(function() {
+        return modal.find('.expenditure-loading').hide();
+      }).error(function() {
+        return modal.find('.expenditure-error').show();
+      });
+      candidate_info = window.organizational_records.filter(function(d) {
+        return d.reg_no === reg_no;
+      })[0];
+      candidate_name = candidate_info.candidate_name;
+      candidate_office = candidate_info.office;
+      modal.find('.candidate_name').text(candidate_name);
+      cur_year = candidate_utils.get_vis_year();
+      modal.find('.current_year').text(cur_year);
+      modal.find('.candidate_office').text(candidate_office);
+      return modal.find('.expenditure_category_title').text(category);
+    };
+
     return BubbleChart;
 
   })();
 
-  CandidateModal = (function() {
-    function CandidateModal(data, i, element) {
-      var matched, reg_no;
-      reg_no = data.reg_no;
-      matched = window.records.filter(function(d) {
-        return d.reg_no === reg_no;
-      });
-      debugger;
+  root = typeof exports !== "undefined" && exports !== null ? exports : this;
+
+  CandidateUtil = (function() {
+    function CandidateUtil() {
+      this.get_island = __bind(this.get_island, this);
+      this.get_vis_year = __bind(this.get_vis_year, this);
     }
 
-    CandidateModal.prototype.render = function() {
-      var modal;
-      modal = $('#candidate_modal');
-      return modal.foundation('reveal', 'open');
+    CandidateUtil.prototype.get_vis_year = function() {
+      var $year_el, cur_year;
+      $year_el = $('.viz_nav.year');
+      return cur_year = $year_el.data('year');
     };
 
-    return CandidateModal;
+    CandidateUtil.prototype.get_island = function(record) {
+      var get_island_by_precinct, kauai, matches, maui, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6;
+      maui = 'Maui, Lanai, Molokai';
+      kauai = 'Kauai, Niihau';
+      get_island_by_precinct = function(precinct) {
+        var as_number, island;
+        as_number = parseInt(precinct.substring(0, 2) + precinct.substring(3, 5));
+        return island = as_number <= 707 ? 'Hawaii' : as_number <= 1303 ? maui : as_number <= 1304 ? maui : as_number <= 1309 ? maui : as_number <= 1605 ? kauai : as_number <= 1606 ? kauai : as_number <= 5106 ? 'Oahu' : 'Error';
+      };
+      if ((_ref = record.office) === 'Governor' || _ref === 'Mayor' || _ref === 'Lt. Governor' || _ref === 'Prosecuting Attorney' || _ref === 'OHA' || _ref === 'BOE') {
+        return 'All';
+      } else if ((_ref1 = record.office) === 'Honolulu Council') {
+        return 'Oahu';
+      } else if ((_ref2 = record.office) === 'Maui Council') {
+        return maui;
+      } else if ((_ref3 = record.office) === 'Kauai Council') {
+        return kauai;
+      } else if ((_ref4 = record.office) === 'Hawaii Council') {
+        return 'Hawaii';
+      } else if ((_ref5 = record.office) === 'Senate') {
+        matches = window.precinct_records.filter(function(d) {
+          return d.senate === record.district;
+        });
+        return get_island_by_precinct(matches[0].precinct);
+      } else if ((_ref6 = record.office) === 'House') {
+        matches = window.precinct_records.filter(function(d) {
+          return d.house === record.district;
+        });
+        return get_island_by_precinct(matches[0].precinct);
+      } else {
+        return 'Other';
+      }
+    };
+
+    return CandidateUtil;
 
   })();
 
-  root = typeof exports !== "undefined" && exports !== null ? exports : this;
+  root.candidate_utils = new CandidateUtil;
 
   campaignInit = function() {
     $('.legend_hover_area').on('mouseenter', function() {
@@ -621,6 +807,10 @@
           return d.election_period === '2008-2010';
         } else if (year === 2008) {
           return d.election_period === '2006-2008';
+        } else if (year === 'gov') {
+          return d.election_period === '2012-2014' && d.office === 'Governor';
+        } else if (year === 'senate') {
+          return d.election_period === '2012-2014' && d.office === 'Senate';
         } else {
           return false;
         }
@@ -647,8 +837,7 @@
     root.update_year = function(next) {
       var $year_el, cur_year, direction, filtered_records, next_year, range, records;
       records = window.raw_records;
-      $year_el = $('.viz_nav.year');
-      cur_year = $year_el.data('year');
+      cur_year = candidate_utils.get_vis_year();
       direction = next ? 1 : -1;
       next_year = cur_year + 2 * direction;
       if (next_year === 2008) {
@@ -673,6 +862,7 @@
       if (__indexOf.call(range, next_year) < 0) {
         return;
       }
+      $year_el = $('.viz_nav.year');
       $year_el.animate({
         color: 'white'
       }, {
@@ -689,12 +879,14 @@
       window.records = filtered_records;
       return chart.update_data(filtered_records);
     };
-    render_vis = function(error, expenditure_records, organizational_records) {
+    render_vis = function(error, expenditure_records, organizational_records, precinct_records) {
       var filtered_records, raw_records;
       raw_records = join_data(expenditure_records, organizational_records);
       window.raw_records = raw_records;
       filtered_records = filter_data(raw_records, 2014);
+      window.precinct_records = precinct_records;
       window.records = filtered_records;
+      window.organizational_records = organizational_records;
       chart = new BubbleChart(filtered_records);
       return chart.display_group_all();
     };
@@ -734,7 +926,7 @@
         return window.update_year(false);
       }
     });
-    return queue().defer(d3.csv, "data/campaign_spending_summary.csv").defer(d3.csv, "data/organizational_report.csv").await(render_vis);
+    return queue().defer(d3.csv, "data/campaign_spending_summary.csv").defer(d3.csv, "data/organizational_report.csv").defer(d3.csv, "data/precinct.csv").await(render_vis);
   });
 
 }).call(this);

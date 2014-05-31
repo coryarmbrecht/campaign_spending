@@ -31,3 +31,44 @@ d3.selection.prototype.move_to_front = function() {
     this.parentNode.appendChild(this);
   });
 };
+
+function tabulate(selector, table_class, data, columns) {
+  var table = d3.select(selector).append("table")
+    .attr('class', table_class)
+    thead = table.append("thead"),
+    tbody = table.append("tbody");
+
+  // append the header row
+  thead.append("tr")
+    .selectAll("th")
+    .data(columns)
+    .enter()
+    .append("th")
+      .text(function(column) { return column.display_name; });
+
+  // create a row for each object in the data
+  var rows = tbody.selectAll("tr")
+    .data(data)
+    .enter()
+    .append("tr");
+
+  // create a cell in each row for each column
+  var cells = rows.selectAll("td")
+    .data(function(row) {
+      return columns.map(function(column) {
+        return {column: column, value: row[column.name]};
+      });
+    })
+    .enter()
+    .append("td")
+      .attr('class', function(d) { return d.column.name;})
+      .text(function(d) {
+        if(d.column.func) {
+          return d.column.func(d.value);
+        } else {
+          return d.value;
+        }
+      });
+
+  return table;
+}
