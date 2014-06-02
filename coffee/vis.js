@@ -150,7 +150,7 @@
         });
         $(element).data('center', true);
         return modal.foundation('reveal', 'open');
-      }).transition().duration(3000).attr("r", function(d) {
+      }).attr("r", function(d) {
         return d.radius;
       });
       return circles.exit().remove();
