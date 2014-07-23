@@ -5,6 +5,7 @@
 
   BubbleChart = (function() {
     function BubbleChart(data) {
+      this.size_legend_init = __bind(this.size_legend_init, this);
       this.update_modal = __bind(this.update_modal, this);
       this.render_modal = __bind(this.render_modal, this);
       this.hide_details = __bind(this.hide_details, this);
@@ -40,8 +41,6 @@
       this.circles = null;
       max_amount = 1173620 * 1.21;
       this.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
-      console.log('max_amount ' + max_amount);
-      console.log(this.radius_scale);
       this.create_nodes(this.data);
       this.create_vis();
     }
@@ -100,7 +99,6 @@
       if (func == null) {
         func = 'year';
       }
-      console.log("func is " + func);
       return this.show_viz_type(func);
     };
 
@@ -216,7 +214,8 @@
           return _this.center.y + d.dy;
         };
       })(this));
-      return titles.exit().remove();
+      titles.exit().remove();
+      return this.show_legend(radius);
     };
 
     BubbleChart.prototype.move_towards_center = function(alpha) {
@@ -230,6 +229,7 @@
 
     BubbleChart.prototype.show_viz_type = function(func) {
       var accessor, category_titles, sort_func;
+      this.hide_legend();
       if (func === 'candidate') {
         this.do_split(function(d) {
           return d.name;
@@ -274,7 +274,6 @@
         });
       }
       if (func === 'amount') {
-        console.log('do nothing');
         accessor = function(d) {
           if (d.value > 1e6) {
             return "Over a million";
@@ -638,6 +637,7 @@
       election_period = "" + (year - 2) + "-" + year;
       url_params = "$limit=20&$where=reg_no='" + reg_no + ("'and expenditure_category='" + encoded_category + "' and election_period = '") + election_period + "'&$order=amount desc";
       modal = $('#candidate_modal');
+      modal.find('.expenditure-error').hide();
       modal.find('.expenditure-loading').show();
       $.get("" + url + "?" + url_params, function(data) {
         var columns;
@@ -681,6 +681,78 @@
       modal.find('.current_year').text(cur_year);
       modal.find('.candidate_office').text(candidate_office);
       return modal.find('.expenditure_category_title').text(category);
+    };
+
+    BubbleChart.prototype.size_legend_init = function() {
+      var circles, height, label_buffer, label_text_buffer, largest_legend_offset, largest_radius, legend_sizes, line_x_pos, line_y_pos, radius_range, size_legend, width, y;
+      height = 200;
+      legend_sizes = [
+        {
+          label: '$ 100,000',
+          r: 100 * 1000
+        }, {
+          label: '$ 500,000',
+          r: 500 * 1000
+        }, {
+          label: '$ 1 million',
+          r: 1000000
+        }
+      ];
+      $.each(legend_sizes, (function(_this) {
+        return function(i, d) {
+          return d.r = _this.radius_scale(d.r);
+        };
+      })(this));
+      largest_legend_offset = 40;
+      largest_radius = d3.max(legend_sizes, function(d) {
+        return d.r;
+      });
+      radius_range = d3.extent(legend_sizes, function(d) {
+        return d.r;
+      });
+      y = d3.scale.ordinal().domain(legend_sizes.map(function(d) {
+        return d.r;
+      })).range([-radius_range[0], -(radius_range[1] + largest_legend_offset + radius_range[0]) / 2, -(radius_range[1] + largest_legend_offset)]);
+      y.range(y.range().map(function(d) {
+        return Math.round(d);
+      }));
+      width = $("#size-legend-container").width();
+      size_legend = d3.select("#size-legend-container").append("svg").attr("width", width).attr("height", height).append('g').attr("transform", function(d) {
+        return "translate(" + (width / 2 - width / 6) + "," + (height / 2 + largest_radius) + ")";
+      });
+      circles = size_legend.selectAll("circle").data(legend_sizes);
+      circles.enter().append('circle').attr('r', (function(_this) {
+        return function(d) {
+          return d.r;
+        };
+      })(this)).attr('cx', 0).attr('cy', function(d) {
+        return -d.r;
+      });
+      label_buffer = 40;
+      label_text_buffer = 10;
+      line_y_pos = function(d) {
+        return -d.r - d.r * Math.sin(d.y_ang);
+      };
+      line_x_pos = function(d) {
+        var val;
+        return val = Math.sqrt(Math.pow(d.r, 2) - Math.pow(y(d.r) + d.r, 2));
+      };
+      circles.enter().append('polyline').attr('points', function(d) {
+        return "" + (line_x_pos(d)) + ", " + (y(d.r)) + ", " + (largest_radius + label_buffer) + ", " + (y(d.r));
+      });
+      return circles.enter().append('text').attr('class', 'size_label').attr('x', largest_radius + label_buffer + label_text_buffer).attr('y', function(d) {
+        return y(d.r);
+      }).text(function(d) {
+        return d.label;
+      });
+    };
+
+    BubbleChart.prototype.show_legend = function(radius) {
+      return d3.select('#vis-full-key').transition().duration(1500).style('opacity', 1).style('top', (radius * 2 + 80 + 85) + 'px');
+    };
+
+    BubbleChart.prototype.hide_legend = function() {
+      return d3.select('#vis-full-key').transition().duration(1500).style('opacity', 0).style('top', '2000px');
     };
 
     return BubbleChart;
@@ -742,29 +814,17 @@
   root.candidate_utils = new CandidateUtil;
 
   campaignInit = function() {
-    $('.legend_hover_area').on('mouseenter', function() {
-      return $('.legend').animate({
-        right: 0
-      });
-    });
-    $('.legend').on('mouseleave', function() {
-      return $('.legend').animate({
-        right: '-225px'
-      });
-    });
-    $('.legend .row[data-category]').on('mouseenter', function() {
+    $('.legend tr').on('mouseenter', function() {
       var category, circles;
       category = $(this).data('category');
-      console.log('mouseenter category ' + category);
       circles = d3.selectAll('circle');
       return circles.filter(function(circle) {
         return circle.super_category !== category;
       }).transition().duration(1000).style('opacity', 0.3);
     });
-    return $('.legend .row[data-category]').on('mouseleave', function() {
+    return $('.legend tr[data-category]').on('mouseleave', function() {
       var category, circles;
       category = $(this).data('category');
-      console.log('mouseleave category ' + category);
       circles = d3.selectAll('circle');
       return circles.transition().duration(1000).style('opacity', 1);
     });
@@ -841,22 +901,14 @@
       direction = next ? 1 : -1;
       next_year = cur_year + 2 * direction;
       if (next_year === 2008) {
-        $('.time_nav.left').animate({
-          color: '#bcbbb4'
-        }).removeClass('clickable');
+        $('.viz_nav.year .left-arrow').attr('src', 'images/year_arrow_disabled.png').removeClass('clickable');
       } else {
-        $('.time_nav.left').animate({
-          color: '#454542'
-        }).addClass('clickable');
+        $('.viz_nav.year .left-arrow').attr('src', 'images/year_arrow_transparent.png').addClass('clickable');
       }
       if (next_year === 2014) {
-        $('.time_nav.right').animate({
-          color: '#bcbbb4'
-        }).removeClass('clickable');
+        $('.viz_nav.year .right-arrow').attr('src', 'images/year_arrow_disabled.png').removeClass('clickable');
       } else {
-        $('.time_nav.right').animate({
-          color: '#454542'
-        }).addClass('clickable');
+        $('.viz_nav.year .right-arrow').attr('src', 'images/year_arrow_transparent.png').addClass('clickable');
       }
       range = d3.range(2008, 2014.1, 2);
       if (__indexOf.call(range, next_year) < 0) {
@@ -867,7 +919,7 @@
         color: 'white'
       }, {
         complete: function() {
-          $year_el.text(next_year);
+          $year_el.find('.year-text').text(next_year);
           $year_el.data('year', next_year);
           return $year_el.animate({
             color: '#454542'
@@ -888,7 +940,8 @@
       window.records = filtered_records;
       window.organizational_records = organizational_records;
       chart = new BubbleChart(filtered_records);
-      return chart.display_group_all();
+      chart.display_group_all();
+      return chart.size_legend_init();
     };
     root.get_chart = (function(_this) {
       return function() {
@@ -916,15 +969,25 @@
         return window.get_chart().show_viz_type('year');
       }
     });
-    $('.time_nav.right').on('click', function(e) {
+    $('.viz_nav .right-arrow').on('click', function(e) {
+      e.stopPropagation();
       if ($(this).hasClass('clickable')) {
         return window.update_year(true);
       }
     });
-    $('.time_nav.left').on('click', function(e) {
+    $('.viz_nav .left-arrow').on('click', function(e) {
+      e.stopPropagation();
       if ($(this).hasClass('clickable')) {
         return window.update_year(false);
       }
+    });
+    $('#nav #mini-legend').on('click', function(e) {
+      var pos;
+      e.preventDefault();
+      console.log("clicked mini-legend");
+      pos = $(this).offset();
+      pos.top = 50;
+      return $('#mini-legend-body').slideToggle().offset(pos);
     });
     return queue().defer(d3.csv, "data/campaign_spending_summary.csv").defer(d3.csv, "data/organizational_report.csv").defer(d3.csv, "data/precinct.csv").await(render_vis);
   });
