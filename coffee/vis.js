@@ -6,6 +6,7 @@
   BubbleChart = (function() {
     function BubbleChart(data) {
       this.size_legend_init = __bind(this.size_legend_init, this);
+      this.update_modal_center = __bind(this.update_modal_center, this);
       this.update_modal = __bind(this.update_modal, this);
       this.render_modal = __bind(this.render_modal, this);
       this.hide_details = __bind(this.hide_details, this);
@@ -39,7 +40,7 @@
       this.nodes = [];
       this.forces = [];
       this.circles = null;
-      max_amount = 1173620 * 1.21;
+      max_amount = 1173620 * 2.21;
       this.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
       this.create_nodes(this.data);
       this.create_vis();
@@ -136,18 +137,24 @@
         return that.circles.transition().duration(1000).style('opacity', 1);
       }).on("click", function(d, i) {
         var element, modal;
+        console.log('clicked circle');
         modal = $('#candidate_modal');
         element = this;
-        $(document).off('opened', '[data-reveal]');
-        $(document).on('opened', '[data-reveal]', function() {
-          var callback_modal;
-          callback_modal = $(this);
-          if (callback_modal.attr('id') === modal.attr('id')) {
-            return that.render_modal(d, i, element);
-          }
-        });
-        $(element).data('center', true);
-        return modal.foundation('reveal', 'open');
+        if (modal.is(':visible')) {
+          return that.update_modal_center(d, i, element);
+        } else {
+          $(document).off('opened', '[data-reveal]');
+          $(document).on('opened', '[data-reveal]', function() {
+            var callback_modal;
+            console.log('modal callback');
+            callback_modal = $(this);
+            if (callback_modal.attr('id') === modal.attr('id')) {
+              return that.render_modal(d, i, element);
+            }
+          });
+          $(element).data('center', true);
+          return modal.foundation('reveal', 'open');
+        }
       }).attr("r", function(d) {
         return d.radius;
       });
@@ -560,8 +567,7 @@
       content += "<span class=\"office\">" + data.election_year + ", " + data.office + "</span><br/>";
       content += "<span class=\"amount\"> " + data.category + " $" + (addCommas(data.value)) + "</span><br/>";
       content += "</div>";
-      this.tooltip.showTooltip(content, d3.event);
-      return d3.select(element).move_to_front();
+      return this.tooltip.showTooltip(content, d3.event);
     };
 
     BubbleChart.prototype.hide_details = function(data, i, element) {
@@ -570,7 +576,7 @@
     };
 
     BubbleChart.prototype.render_modal = function(circle_data, i, element) {
-      var center_node, circles, force, largest_radius, link_distance, links, modal_viz_height, modal_viz_padding, modal_viz_width, nodes, non_center_nodes, records, reg_no, tick, viz;
+      var center_loc, center_node, circles, force, largest_radius, link_distance, link_padding, links, modal_viz_height, modal_viz_padding, modal_viz_width, move_center_towards_center, nodes, non_center_nodes, records, reg_no, tick, viz;
       this.kill_forces();
       $('#candidate_vis').find('svg').remove();
       $('#candidate_modal').find('#expenditure-record-table-container').empty();
@@ -582,7 +588,9 @@
         return function(d) {
           return d.reg_no === reg_no;
         };
-      })(this)).data();
+      })(this)).sort(function(a, b) {
+        return d3.descending(a.radius, b.radius);
+      }).data();
       center_node = nodes.filter(function(d) {
         return circle_data.category === d.category;
       })[0];
@@ -592,15 +600,17 @@
       largest_radius = d3.max(non_center_nodes, function(d) {
         return d.radius;
       });
+      console.log("largest radius is " + largest_radius + ", similar to 61?");
+      link_padding = largest_radius > 40 ? 90 : 55;
       links = non_center_nodes.map(function(node) {
         return {
           source: center_node,
           target: node
         };
       });
-      link_distance = Math.max(40, center_node.radius) + 55;
+      link_distance = Math.max(40, center_node.radius) + link_padding;
       modal_viz_padding = 5;
-      modal_viz_height = link_distance * 2.05 + largest_radius * 4 + modal_viz_padding * 2;
+      modal_viz_height = link_distance * 2 + largest_radius * 2 + modal_viz_padding * 2;
       modal_viz_width = $('#candidate_vis').width();
       viz = d3.select('#candidate_vis').append('svg').attr('width', '100%').attr('height', modal_viz_height);
       circles = viz.selectAll('circle').data(nodes, function(d) {
@@ -615,16 +625,40 @@
       }).attr('cy', function(d) {
         return d.y;
       });
-      tick = function() {
-        return circles.attr("cx", function(d) {
-          return d.x;
-        }).attr("cy", function(d) {
-          return d.y;
-        });
+      center_loc = {
+        x: modal_viz_width / 2,
+        y: modal_viz_height / 2
       };
-      force = d3.layout.force().size([modal_viz_width, modal_viz_height]).nodes(nodes).links(links).friction(0.7).theta(0.5).gravity(0.2).charge(function(d) {
-        return -300 + -100 * Math.log(d.radius);
-      }).linkDistance(link_distance).on('tick', tick).start();
+      console.log("Center loc is " + JSON.stringify(center_loc));
+      move_center_towards_center = (function(_this) {
+        return function(alpha) {
+          return function(d) {
+            if (d.id === center_node.id) {
+              d.x = d.x + (center_loc.x - d.x) * (_this.damper + 0.02) * alpha;
+              return d.y = d.y + (center_loc.y - d.y) * (_this.damper + 0.02) * alpha;
+            }
+          };
+        };
+      })(this);
+      tick = (function(_this) {
+        return function(e) {
+          return circles.each(move_center_towards_center(e.alpha)).attr("cx", function(d) {
+            return d.x;
+          }).attr("cy", function(d) {
+            return d.y;
+          });
+        };
+      })(this);
+      console.log("force layout with width " + modal_viz_width + " height: " + modal_viz_height);
+      force = d3.layout.force().size([modal_viz_width, modal_viz_height]).nodes(nodes).links(links).friction(0.7).theta(0.5).gravity(0.4).charge((function(_this) {
+        return function(d) {
+          var charge;
+          charge = -300 + -200 * Math.log(d.radius);
+          _this.charge(d) * 50;
+          return charge;
+        };
+      })(this)).linkDistance(link_distance).on('tick', tick).start();
+      window.force = force;
       return this.update_modal(reg_no, circle_data.category);
     };
 
@@ -681,6 +715,11 @@
       modal.find('.current_year').text(cur_year);
       modal.find('.candidate_office').text(candidate_office);
       return modal.find('.expenditure_category_title').text(category);
+    };
+
+    BubbleChart.prototype.update_modal_center = function(circle_data, i, element) {
+      console.log("going to update the center node!");
+      return this.render_modal(circle_data, i, element);
     };
 
     BubbleChart.prototype.size_legend_init = function() {
@@ -936,6 +975,7 @@
       raw_records = join_data(expenditure_records, organizational_records);
       window.raw_records = raw_records;
       filtered_records = filter_data(raw_records, 2014);
+      filtered_records = filter_data(raw_records, 'gov');
       window.precinct_records = precinct_records;
       window.records = filtered_records;
       window.organizational_records = organizational_records;
